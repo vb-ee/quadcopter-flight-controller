@@ -10,10 +10,16 @@ RF24 radio(8, 9);
 #define rl 2
 #define yw 3
 
+#define stopped 0
+#define starting 1
+#define started 2
+
 #define channel_number 4
 #define sigPin 2
 #define PPM_FrLen 27000
 #define PPM_PulseLen 400
+
+#define refresh_rate 250
 
 #define clockMultiplier 2
 
@@ -35,17 +41,22 @@ QuadData sent_data;
 
 float accel_x, accel_y, accel_z;
 float gyro_x, gyro_y, gyro_z;
-float gyro_roll, gyro_pitch, gyro_yaw;
 float gyro_x_avg, gyro_y_avg, gyro_z_avg;
-float accel_vec_mag;
-boolean set_gyro_angle;
+float acc_pitch_angle, acc_roll_angle;
+
+float gyro_roll, gyro_pitch, gyro_yaw;
 float pitch_angle, roll_angle, yaw_angle;
 float measured_pitch, measured_roll, measured_yaw;
-float acc_pitch_angle, acc_roll_angle;
-unsigned long int loop_timer, time_diff;
+
 int temp;
+float accel_vec_mag;
+boolean gyro_angle_set;
+
+unsigned long int loop_timer, time_diff;
 unsigned long int esc1, esc2, esc3, esc4;
+
 float roll_setpoint, pitch_setpoint, yaw_setpoint;
+
 float kp_roll = 1.2;
 float ki_roll = 0.05;
 float kd_roll = 18;
@@ -55,17 +66,18 @@ float kd_pitch = kd_roll;
 float kp_yaw = 3;
 float ki_yaw = 0.02;
 float kd_yaw = 0;
+
 float roll_pid, pitch_pid, yaw_pid;
 float pitch_error, roll_error, yaw_error;
 float pitch_pid_i, roll_pid_i, yaw_pid_i;
 float previous_pitch_error, previous_roll_error, previous_yaw_error;
+
 int throttle;
 int battery_voltage;
 float pid_max = 400;
-int analog_battery = A0;
 int led_pin = 4;
-int led_pin1 = 5;
 
+int status = stopped;
 
 void setup() {
   Wire.begin();
@@ -102,8 +114,6 @@ void setup() {
 
 
 void loop() {   
-  get_from_rf();
-
   read_mpu();
 
   calculate_angles();
@@ -185,7 +195,7 @@ void read_mpu() {
 
 void calibrate_gyro() {
   for (int i = 0; i < 2000; i++) {
-    if (i % 15 == 0) digitalWrite(12, !digitalRead(12));  // Change the led status to indicate calibration.
+    if (i % 15 == 0) digitalWrite(led_pin, !digitalRead(led_pin));  // Change the led status to indicate calibration.
     read_mpu();
     gyro_x_avg += gyro_x;
     gyro_y_avg += gyro_y;
@@ -209,11 +219,11 @@ void calculate_gyro_angles() {
   gyro_y -= gyro_y_avg;
   gyro_z -= gyro_z_avg;
 
-  pitch_angle += gyro_y * 0.0000763;
-  roll_angle += gyro_x * 0.0000763;
+  pitch_angle += (gyro_y / (refresh_rate * 65.5));
+  roll_angle += (gyro_x / (refresh_rate * 65.5));
 
-  pitch_angle -= roll_angle * sin(gyro_z * 0.00000133);
-  roll_angle += pitch_angle * sin(gyro_z * 0.00000133);
+  pitch_angle -= roll_angle * sin(gyro_z * (PI / (refresh_rate * 65.5 * 180)));
+  roll_angle += pitch_angle * sin(gyro_z * (PI / (refresh_rate * 65.5 * 180)));
 }
 
 
@@ -221,10 +231,10 @@ void calculate_accel_angles() {
   accel_vec_mag = sqrt((accel_x * accel_x) + (accel_y * accel_y) + (accel_z * accel_z));
 
   if (abs(accel_x) < accel_vec_mag) {
-    acc_pitch_angle = asin(accel_x / accel_vec_mag) * -57.296;
+    acc_pitch_angle = asin((float)accel_x / accel_vec_mag) * -(180 / PI);
   }
   if (abs(accel_y) < accel_vec_mag) {
-    acc_roll_angle = asin(accel_y / accel_vec_mag) * 57.296;
+    acc_roll_angle = asin((float)accel_y / accel_vec_mag) * (180 / PI);
   }
 }
 
@@ -233,18 +243,18 @@ void calculate_angles() {
   calculate_gyro_angles();
   calculate_accel_angles();
 
-  if (set_gyro_angle) {
+  if (gyro_angle_set) {
     pitch_angle = pitch_angle * 0.9996 + acc_pitch_angle * 0.0004;
     roll_angle = roll_angle * 0.9996 + acc_roll_angle * 0.0004;
   }
   else {
     reset_gyro_angles();
-    set_gyro_angle = true;
+    gyro_angle_set = true;
   }
 
-  measured_pitch = measured_pitch * 0.9 + pitch_angle * 0.1;
-  measured_roll = measured_roll * 0.9 + roll_angle * 0.1;
-  measured_yaw = -gyro_z / 65.5;
+//  measured_pitch = measured_pitch * 0.9 + pitch_angle * 0.1;
+//  measured_roll = measured_roll * 0.9 + roll_angle * 0.1;
+//  measured_yaw = -gyro_z / 65.5;
 
   gyro_pitch = 0.7 * gyro_pitch + 0.3 * gyro_y / 65.5;
   gyro_roll = 0.7 * gyro_roll + 0.3 * gyro_x / 65.5;
@@ -305,6 +315,30 @@ void reset_pid_values() {
   previous_yaw_error = 0;
 }
 
+bool is_started() {
+  // When left stick is moved in the bottom left corner
+  if (status == stopped && pulse_length[mode_mapping[YAW]] <= 1012 && pulse_length[mode_mapping[THROTTLE]] <= 1012) {
+    status = starting;
+  }
+
+  // When left stick is moved back in the center position
+  if (status == starting && pulse_length[mode_mapping[YAW]] == 1500 && pulse_length[mode_mapping[THROTTLE]] <= 1012) {
+    status = started;
+
+    // Reset PID controller's variables to prevent bump start
+    reset_pid_values();
+
+    reset_gyro_angles();
+  }
+
+  // When left stick is moved in the bottom right corner
+  if (status == started && pulse_length[mode_mapping[YAW]] >= 1988 && pulse_length[mode_mapping[THROTTLE]] <= 1012) {
+    status = stopped;
+    // Make sure to always stop motors when status is STOPPED
+    stop_all();
+  }
+ return status == started;  
+}
 
 void state_checking() {
   if (ppm[th] < 1020)stop_all();

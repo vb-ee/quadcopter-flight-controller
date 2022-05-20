@@ -34,7 +34,7 @@ volatile byte previous_state[4];
 
 // Duration of the pulse on each channel of the receiver in µs (must be within 1000µs & 2000µs)
 volatile unsigned int pulse_length[4] = {1500, 1500, 1000, 1500};
--
+
 // Used to calculate pulse duration on each channel
 volatile unsigned long current_time;
 volatile unsigned long timer[4]; // Timer of each channel
