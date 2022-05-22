@@ -66,7 +66,8 @@ void setup_ppm() {
 void setup() {
   reset_data();
   setup_ppm();
-  Serial.begin(115200);
+  Serial.begin(57600);
+  
   radio.begin();
   radio.setAutoAck(false);
   radio.setPALevel(RF24_PA_LOW);
@@ -78,7 +79,7 @@ void setup() {
 
 
 void loop() {
-  recieve_data();
+  receive_data();
 
   unsigned long now = millis();
   if (now - last_recv_time > 1000) {
@@ -89,7 +90,7 @@ void loop() {
   print_data();
 }
 
-void recieve_data()
+void receive_data()
 {
   while ( radio.available() ) {
     radio.read(&sent_data, sizeof(QuadData));
