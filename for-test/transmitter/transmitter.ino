@@ -13,13 +13,13 @@ struct QuadData {
   byte yaw;
 };
 
-QuadData sent_data;
+QuadData quad_data;
 
 void reset_data() {
-  sent_data.throttle = 0;
-  sent_data.pitch = 127;
-  sent_data.roll = 127;
-  sent_data.yaw = 127;
+  quad_data.throttle = 127;
+  quad_data.pitch = 127;
+  quad_data.roll = 127;
+  quad_data.yaw = 127;
 }
 
 int map_joystick_values(int val, int lower, int middle, int upper, bool reverse)
@@ -48,12 +48,12 @@ void setup()
 
 void loop()
 {
-  sent_data.throttle = map_joystick_values( analogRead(A0), 16, 518, 996, true );
-  sent_data.yaw      = map_joystick_values( analogRead(A1), 16, 510, 1004, true );
-  sent_data.pitch    = map_joystick_values( analogRead(A2), 16, 526, 1006, true );
-  sent_data.roll     = map_joystick_values( analogRead(A3), 16, 517, 988, true );
+  quad_data.throttle = map_joystick_values( analogRead(A0), 16, 518, 996, true );
+  quad_data.yaw      = map_joystick_values( analogRead(A1), 16, 510, 1004, true );
+  quad_data.pitch    = map_joystick_values( analogRead(A2), 16, 526, 1006, true );
+  quad_data.roll     = map_joystick_values( analogRead(A3), 16, 517, 988, true );
 
-  radio.write(&sent_data, sizeof(QuadData));
+  radio.write(&quad_data, sizeof(QuadData));
 }
 
 void printJoustickValues() {
