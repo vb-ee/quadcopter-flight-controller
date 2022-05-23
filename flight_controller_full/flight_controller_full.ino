@@ -1,45 +1,22 @@
 #include <Wire.h>
-#include <SPI.h>
-#include <nRF24L01.h>
-#include <RF24.h>
 
-RF24 radio(8, 9);
-
-#define th 0
-#define pt 1
-#define rl 2
-#define yw 3
+#define throt 0
+#define pitch 1
+#define roll 2
+#define yaw 3
 
 #define stopped 0
 #define starting 1
 #define started 2
 
-#define channel_number 4
-#define sigPin 2
-#define PPM_FrLen 27000
-#define PPM_PulseLen 400
-
 #define refresh_rate 250
 
-#define clockMultiplier 2
+volatile int receiver_input[4];
+volatile int pulse_length[4];
+volatile unsigned long timer_1, timer_2, timer_3, timer_4, current_time;
+volatile byte last_channel_1, last_channel_2, last_channel_3, last_channel_4;
 
-
-const uint64_t nrf24_address = 0xE8E8F0F0E1LL;
-
-int ppm[channel_number];
-
-unsigned long last_recv_time;
-
-struct QuadData {
-  byte throttle;
-  byte pitch;
-  byte roll;
-  byte yaw;
-};
-
-QuadData sent_data;
-
-float accel_x, accel_y, accel_z;
+float accel_x, accel_y, accel_z; 
 float gyro_x, gyro_y, gyro_z;
 float gyro_x_avg, gyro_y_avg, gyro_z_avg;
 float acc_pitch_angle, acc_roll_angle;
@@ -75,7 +52,8 @@ float previous_pitch_error, previous_roll_error, previous_yaw_error;
 int throttle;
 int battery_voltage;
 float pid_max = 400;
-int led_pin = 4;
+int led_pin = 2;
+int counter;
 
 int status = stopped;
 
@@ -83,11 +61,9 @@ void setup() {
   Wire.begin();
   TWBR = 12; // Set I2C clock frequency to 400kHz
   Serial.begin(57600);
-  
-  set_nrf24(nrf24_address);
-  
+   
   DDRB |= B11110000; // Set 4, 5, 6, 7 pins as outputs
-  pinMode(led_pin, OUTPUT);
+  pinMode(led_pin, OUTPUT); // Change this line to port manipulation
   
   digitalWrite(led_pin, HIGH);
 
@@ -101,10 +77,28 @@ void setup() {
   }
   
   calibrate_gyro();
-  
-  setup_ppm();
-  reset_data();
-  
+
+  PCICR  |= (1 << PCIE0);  // Set PCIE0 to enable PCMSK0 scan
+  PCMSK0 |= (1 << PCINT4); // Set PCINT4 (digital input 10) to trigger an interrupt on state change
+  PCMSK0 |= (1 << PCINT5); // Set PCINT5 (digital input 11) to trigger an interrupt on state change
+  PCMSK0 |= (1 << PCINT6); // Set PCINT6 (digital input 12)to trigger an interrupt on state change
+  PCMSK0 |= (1 << PCINT7); // Set PCINT7 (digital input 13)to trigger an interrupt on state change
+
+  while (pulse_length[throt] < 990 || pulse_length[throttle] > 1020 || pulse_length[yaw] < 1400) {
+      pulse_length[throt] = convert_receiver_input(3);                 //Convert the actual receiver signals for throttle to the standard 1000 - 2000us
+      pulse_length[yaw] = convert_receiver_input(4);                 //Convert the actual receiver signals for yaw to the standard 1000 - 2000us
+    counter++;                                                               //While waiting increment start whith every loop.
+    //We don't want the esc's to be beeping annoyingly. So let's give them a 1000us puls while waiting for the receiver inputs.
+    PORTB |= B11110000;                                                     //Set digital poort 4, 5, 6 and 7 high.
+    delayMicroseconds(1000);                                                //Wait 1000us.
+    PORTB &= B00001111;                                                     //Set digital poort 4, 5, 6 and 7 low.
+    delay(3);                                                               //Wait 3 milliseconds before the next loop.
+    if (counter == 125) {                                                     //Every 125 loops (500ms).
+      digitalWrite(led_pin, !digitalRead(led_pin));                                   //Change the led status.
+      counter = 0;                                                            //Start again at 0.
+    }
+  }
+    
   battery_voltage = (analogRead(0) + 65) * 1.2317;
 
   loop_timer = micros();
@@ -120,30 +114,18 @@ void loop() {
 
   calculate_setpoints();
 
-  state_checking();
-
   calculate_pid();
+  
+  if (is_started()) {
 
   pid_control();
 
-  //  compensate_battery();
+// For now we use static power supply not battery, so we dont need this function
+//  compensate_battery(); 
+  }
 
-  //  print_info();
-
-  //  print_data();
 
   run_motors();
-}
-
-void set_nrf24(uint64_t address) {
-  radio.begin();
-  radio.setAutoAck(false);
-  radio.setPALevel(RF24_PA_LOW);
-  radio.setChannel(110);
-  radio.openReadingPipe(1, address);
-  radio.setDataRate(RF24_250KBPS);
-  radio.startListening();
-
 }
 
 void set_mpu6050() {
@@ -182,6 +164,9 @@ void read_mpu() {
   Wire.write(0x3B);
   Wire.endTransmission();
   Wire.requestFrom(0x68, 14);
+
+  convert_receiver_signals();
+  
   while (Wire.available() < 14);
   accel_x = Wire.read() << 8 | Wire.read();
   accel_y = Wire.read() << 8 | Wire.read();
@@ -269,9 +254,9 @@ void reset_gyro_angles() {
 
 
 void calculate_setpoints() {
-  pitch_setpoint = calculate_setpoint(measured_pitch, ppm[pt]);
-  roll_setpoint = calculate_setpoint(measured_roll, ppm[rl]);
-  yaw_setpoint = calculate_yaw_setpoint(ppm[yw], ppm[th]);
+  pitch_setpoint = calculate_setpoint(measured_pitch, pulse_length[pitch]);
+  roll_setpoint = calculate_setpoint(measured_roll, pulse_length[roll]);
+  yaw_setpoint = calculate_yaw_setpoint(pulse_length[yaw], pulse_length[throt]);
 }
 
 
@@ -317,12 +302,12 @@ void reset_pid_values() {
 
 bool is_started() {
   // When left stick is moved in the bottom left corner
-  if (status == stopped && pulse_length[mode_mapping[YAW]] <= 1012 && pulse_length[mode_mapping[THROTTLE]] <= 1012) {
+  if (status == stopped && pulse_length[yaw] < 1050 && pulse_length[throt] < 1050) {
     status = starting;
   }
 
   // When left stick is moved back in the center position
-  if (status == starting && pulse_length[mode_mapping[YAW]] == 1500 && pulse_length[mode_mapping[THROTTLE]] <= 1012) {
+  if (status == starting && pulse_length[yaw] > 1450 && pulse_length[throt] < 1050) {
     status = started;
 
     // Reset PID controller's variables to prevent bump start
@@ -332,22 +317,13 @@ bool is_started() {
   }
 
   // When left stick is moved in the bottom right corner
-  if (status == started && pulse_length[mode_mapping[YAW]] >= 1988 && pulse_length[mode_mapping[THROTTLE]] <= 1012) {
+  if (status == started && pulse_length[yaw] > 1950 && pulse_length[throt] < 1050) {
     status = stopped;
     // Make sure to always stop motors when status is STOPPED
     stop_all();
   }
  return status == started;  
 }
-
-void state_checking() {
-  if (ppm[th] < 1020)stop_all();
-  if (ppm[th] < 1050 && ppm[th] >= 1020) {
-    reset_pid_values();
-    reset_gyro_angles();
-  }
-}
-
 
 void stop_all() {
   esc1 = 1000;
@@ -388,24 +364,23 @@ void calculate_pid() {
 
 
 void pid_control() {
-  throttle = ppm[th];
+  throttle = pulse_length[throt];
   if (throttle > 1800)throttle = 1800;
-  if (throttle >= 1050) {
-    esc1 = throttle - roll_pid + pitch_pid + yaw_pid;
-    esc2 = throttle + roll_pid + pitch_pid - yaw_pid;
-    esc3 = throttle - roll_pid - pitch_pid - yaw_pid;
-    esc4 = throttle + roll_pid - pitch_pid + yaw_pid;
 
-    if (esc1 < 1100) esc1 = 1100;
-    if (esc2 < 1100) esc2 = 1100;
-    if (esc3 < 1100) esc3 = 1100;
-    if (esc4 < 1100) esc4 = 1100;
+  esc1 = throttle - roll_pid + pitch_pid + yaw_pid;
+  esc2 = throttle + roll_pid + pitch_pid - yaw_pid;
+  esc3 = throttle - roll_pid - pitch_pid - yaw_pid;
+  esc4 = throttle + roll_pid - pitch_pid + yaw_pid;
 
-    if (esc1 > 2000) esc1 = 2000;
-    if (esc2 > 2000) esc2 = 2000;
-    if (esc3 > 2000) esc3 = 2000;
-    if (esc4 > 2000) esc4 = 2000;
-  }
+  if (esc1 < 1100) esc1 = 1100;
+  if (esc2 < 1100) esc2 = 1100;
+  if (esc3 < 1100) esc3 = 1100;
+  if (esc4 < 1100) esc4 = 1100;
+
+  if (esc1 > 2000) esc1 = 2000;
+  if (esc2 > 2000) esc2 = 2000;
+  if (esc3 > 2000) esc3 = 2000;
+  if (esc4 > 2000) esc4 = 2000;
 }
 
 
@@ -442,55 +417,64 @@ void compensate_battery() {
   }
 }
 
-
-
-void reset_data() {
-  sent_data.throttle = 0;
-  sent_data.pitch = 127;
-  sent_data.roll = 127;
-  sent_data.yaw = 127;
-  set_ppm_values();
+int convert_receiver_input(byte channel) {
+      
 }
 
-void set_ppm_values() {
-  ppm[th] = map(sent_data.throttle, 0, 255, 1000, 2000);
-  ppm[pt] = map(sent_data.pitch,      0, 255, 1000, 2000);
-  ppm[rl] = map(sent_data.roll,    0, 255, 1000, 2000);
-  ppm[yw] = map(sent_data.yaw,     0, 255, 1000, 2000);
+void convert_receiver_signals() {
+  pulse_length[throt] = convert_receiver_input(throt);
+  pulse_length[pitch] = convert_receiver_input(pitch);
+  pulse_length[roll] = convert_receiver_input(roll);
+  pulse_length[yaw] = convert_receiver_input(yaw);
 }
 
-void setup_ppm() {
-  pinMode(sigPin, OUTPUT);
-  digitalWrite(sigPin, 0);
-
-  cli();
-  TCCR1A = 0;
-  TCCR1B = 0;
-
-  OCR3B = 100;
-  TCCR1B |= (1 << WGM12);
-  TCCR1B |= (1 << CS11);
-  TIMSK1 |= (1 << OCIE1A);
-  sei();
-}
-
-void recieve_data()
-{
-  while ( radio.available() ) {
-    radio.read(&sent_data, sizeof(QuadData));
-    last_recv_time = millis();
+ISR(PCINT0_vect) {
+  current_time = micros();
+  //Channel 1=========================================
+  if (PINB & B00010000) {                                                   //Is input 10 high?
+    if (last_channel_1 == 0) {                                              //Input 10 changed from 0 to 1.
+      last_channel_1 = 1;                                                   //Remember current input state.
+      timer_1 = current_time;                                               //Set timer_1 to current_time.
+    }
   }
-}
-
-void get_from_rf() {
-  recieve_data();
-
-  unsigned long now = millis();
-  if (now - last_recv_time > 1000) {
-    reset_data();
+  else if (last_channel_1 == 1) {                                           //Input 10 is not high and changed from 1 to 0.
+    last_channel_1 = 0;                                                     //Remember current input state.
+    receiver_input[0] = current_time - timer_1;                             //Channel 1 is current_time - timer_1.
   }
+  //Channel 2=========================================
+  if (PINB & B00100000 ) {                                                  //Is input 11 high?
+    if (last_channel_2 == 0) {                                              //Input 11 changed from 0 to 1.
+      last_channel_2 = 1;                                                   //Remember current input state.
+      timer_2 = current_time;                                               //Set timer_2 to current_time.
+    }
+  }
+  else if (last_channel_2 == 1) {                                           //Input 11 is not high and changed from 1 to 0.
+    last_channel_2 = 0;                                                     //Remember current input state.
+    receiver_input[1] = current_time - timer_2;                             //Channel 2 is current_time - timer_2.
+  }
+  //Channel 3=========================================
+  if (PINB & B01000000 ) {                                                  //Is input 12 high?
+    if (last_channel_3 == 0) {                                              //Input 12 changed from 0 to 1.
+      last_channel_3 = 1;                                                   //Remember current input state.
+      timer_3 = current_time;                                               //Set timer_3 to current_time.
+    }
+  }
+  else if (last_channel_3 == 1) {                                           //Input 12 is not high and changed from 1 to 0.
+    last_channel_3 = 0;                                                     //Remember current input state.
+    receiver_input[2] = current_time - timer_3;                             //Channel 3 is current_time - timer_3.
 
-  set_ppm_values();
+  }
+  //Channel 4=========================================
+  if (PINB & B10000000 ) {                                                  //Is input 13 high?
+    if (last_channel_4 == 0) {                                              //Input 13 changed from 0 to 1.
+      last_channel_4 = 1;                                                   //Remember current input state.
+      timer_4 = current_time;                                               //Set timer_4 to current_time.
+    }
+  }
+  else if (last_channel_4 == 1) {                                           //Input 13 is not high and changed from 1 to 0.
+    last_channel_4 = 0;                                                     //Remember current input state.
+    receiver_input[3] = current_time - timer_4;                             //Channel 4 is current_time - timer_4.
+  }
 }
 
 void print_info() {
@@ -514,45 +498,11 @@ void print_data() {
   Serial.print("Loop time: ");
   Serial.print(micros() - loop_timer);
   Serial.print(" Throttle: ");
-  Serial.print(ppm[th]);
+  Serial.print(pulse_length[throt]);
   Serial.print(" Pitch: ");
-  Serial.print(ppm[pt]);
+  Serial.print(pulse_length[pitch]);
   Serial.print(" Roll: ");
-  Serial.print(ppm[rl]);
+  Serial.print(pulse_length[roll]);
   Serial.print(" Yaw: ");
-  Serial.println(ppm[yw]);
-  //  Serial.print(" Stop: ");
-  //  Serial.println(ppm[st]);
-}
-
-
-ISR(TIMER1_COMPA_vect) {
-  static boolean state = true;
-
-  TCNT1 = 0;
-
-  if ( state ) {
-    PORTE &= B00010000;
-    OCR3B = PPM_PulseLen * clockMultiplier;
-    state = false;
-  }
-  else {
-    static byte cur_chan_numb;
-    static unsigned int calc_rest;
-
-    PORTE |= B00010000;
-    state = true;
-
-    if (cur_chan_numb >= channel_number) {
-      cur_chan_numb = 0;
-      calc_rest += PPM_PulseLen;
-      OCR3B = (PPM_FrLen - calc_rest) * clockMultiplier;
-      calc_rest = 0;
-    }
-    else {
-      OCR3B = (ppm[cur_chan_numb] - PPM_PulseLen) * clockMultiplier;
-      calc_rest += ppm[cur_chan_numb];
-      cur_chan_numb++;
-    }
-  }
+  Serial.println(pulse_length[yaw]);
 }
