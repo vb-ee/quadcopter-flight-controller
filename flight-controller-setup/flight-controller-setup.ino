@@ -366,30 +366,20 @@ void loop(){
     Serial.println(F("Writing EEPROM"));
     delay(1000);
     Serial.println(F("Done!"));
-    EEPROM.write(0, center_channel_1 & 0b11111111);
-    EEPROM.write(1, center_channel_1 >> 8);
-    EEPROM.write(2, center_channel_2 & 0b11111111);
-    EEPROM.write(3, center_channel_2 >> 8);
-    EEPROM.write(4, center_channel_3 & 0b11111111);
-    EEPROM.write(5, center_channel_3 >> 8);
-    EEPROM.write(6, center_channel_4 & 0b11111111);
-    EEPROM.write(7, center_channel_4 >> 8);
-    EEPROM.write(8, high_channel_1 & 0b11111111);
-    EEPROM.write(9, high_channel_1 >> 8);
-    EEPROM.write(10, high_channel_2 & 0b11111111);
-    EEPROM.write(11, high_channel_2 >> 8);
-    EEPROM.write(12, high_channel_3 & 0b11111111);
-    EEPROM.write(13, high_channel_3 >> 8);
-    EEPROM.write(14, high_channel_4 & 0b11111111);
-    EEPROM.write(15, high_channel_4 >> 8);
-    EEPROM.write(16, low_channel_1 & 0b11111111);
-    EEPROM.write(17, low_channel_1 >> 8);
-    EEPROM.write(18, low_channel_2 & 0b11111111);
-    EEPROM.write(19, low_channel_2 >> 8);
-    EEPROM.write(20, low_channel_3 & 0b11111111);
-    EEPROM.write(21, low_channel_3 >> 8);
-    EEPROM.write(22, low_channel_4 & 0b11111111);
-    EEPROM.write(23, low_channel_4 >> 8);
+    // 16 bit variables
+    EEPROM.put(0, center_channel_1);
+    EEPROM.put(2, center_channel_2);
+    EEPROM.put(4, center_channel_3);
+    EEPROM.put(6, center_channel_4);
+    EEPROM.put(8, high_channel_1);
+    EEPROM.put(10, high_channel_2);
+    EEPROM.put(12, high_channel_3);
+    EEPROM.put(14, high_channel_4);
+    EEPROM.put(16, low_channel_1);
+    EEPROM.put(18, low_channel_2);
+    EEPROM.put(20, low_channel_3);
+    EEPROM.put(22, low_channel_4);
+    // 8 bit variables
     EEPROM.write(24, channel_1_assign);
     EEPROM.write(25, channel_2_assign);
     EEPROM.write(26, channel_3_assign);
@@ -400,28 +390,28 @@ void loop(){
     EEPROM.write(31, type);
     EEPROM.write(32, gyro_address);
     //Write the EEPROM signature
-    EEPROM.write(33, 'J'); 
-    EEPROM.write(34, 'M');
-    EEPROM.write(35, 'B');
+    EEPROM.write(33, 'V'); 
+    EEPROM.write(34, 'B');
+    EEPROM.write(35, 'M');
         
     
     //To make sure evrything is ok, verify the EEPROM data.
     Serial.println(F("Verify EEPROM data"));
     delay(1000);
-    if(center_channel_1 != ((EEPROM.read(1) << 8) | EEPROM.read(0)))error = 1;
-    if(center_channel_2 != ((EEPROM.read(3) << 8) | EEPROM.read(2)))error = 1;
-    if(center_channel_3 != ((EEPROM.read(5) << 8) | EEPROM.read(4)))error = 1;
-    if(center_channel_4 != ((EEPROM.read(7) << 8) | EEPROM.read(6)))error = 1;
+    if(center_channel_1 != EEPROM.get(0, center_channel_1))error = 1;
+    if(center_channel_2 != EEPROM.get(2, center_channel_2))error = 1;
+    if(center_channel_3 != EEPROM.get(4, center_channel_3))error = 1;
+    if(center_channel_4 != EEPROM.get(6, center_channel_4))error = 1;
     
-    if(high_channel_1 != ((EEPROM.read(9) << 8) | EEPROM.read(8)))error = 1;
-    if(high_channel_2 != ((EEPROM.read(11) << 8) | EEPROM.read(10)))error = 1;
-    if(high_channel_3 != ((EEPROM.read(13) << 8) | EEPROM.read(12)))error = 1;
-    if(high_channel_4 != ((EEPROM.read(15) << 8) | EEPROM.read(14)))error = 1;
+    if(high_channel_1 != EEPROM.get(8, high_channel_1))error = 1;
+    if(high_channel_2 != EEPROM.get(10, high_channel_2))error = 1;
+    if(high_channel_3 != EEPROM.get(12, high_channel_3))error = 1;
+    if(high_channel_4 != EEPROM.get(14, high_channel_4))error = 1;
     
-    if(low_channel_1 != ((EEPROM.read(17) << 8) | EEPROM.read(16)))error = 1;
-    if(low_channel_2 != ((EEPROM.read(19) << 8) | EEPROM.read(18)))error = 1;
-    if(low_channel_3 != ((EEPROM.read(21) << 8) | EEPROM.read(20)))error = 1;
-    if(low_channel_4 != ((EEPROM.read(23) << 8) | EEPROM.read(22)))error = 1;
+    if(low_channel_1 != EEPROM.get(16, low_channel_1))error = 1;
+    if(low_channel_2 != EEPROM.get(18, low_channel_2))error = 1;
+    if(low_channel_3 != EEPROM.get(20, low_channel_3))error = 1;
+    if(low_channel_4 != EEPROM.get(22, low_channel_4))error = 1;
     
     if(channel_1_assign != EEPROM.read(24))error = 1;
     if(channel_2_assign != EEPROM.read(25))error = 1;
