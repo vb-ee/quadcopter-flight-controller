@@ -418,7 +418,7 @@ void compensate_battery() {
 }
 
 int convert_receiver_input(byte channel) {
-      
+                
 }
 
 void convert_receiver_signals() {
