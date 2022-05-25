@@ -56,7 +56,7 @@ void setup(){
   set_gyro_registers();                                                                 //Set the specific gyro registers.
 
   //Check the EEPROM signature to make sure that the setup program is executed.
-  while(eeprom_data[33] != 'J' || eeprom_data[34] != 'M' || eeprom_data[35] != 'B'){
+  while(eeprom_data[33] != 'V' || eeprom_data[34] != 'B' || eeprom_data[35] != 'M'){
     delay(500);                                                                         //Wait for 500ms.
     digitalWrite(12, !digitalRead(12));                                                 //Change the led status to indicate error.
   }
