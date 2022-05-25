@@ -40,8 +40,9 @@ void setup(){
   Wire.begin();                                                                         //Start the wire library as master
   TWBR = 12;                                                                            //Set the I2C clock speed to 400kHz.
 
-  DDRB |= B11110000;                                                                    //Configure digital poort 4, 5, 6 and 7 as output.
-  DDRB |= B00010000;                                                                    //Configure digital poort 12 as output.
+  DDRA |= B11110000;                                                                    //Configure digital poort 26, 27, 28 and 29 as output.
+  
+  DDRE |= B00001000;                                                                    //Configure digital poort 2 as output.
 
   PCICR  |= (1 << PCIE0);  // Set PCIE0 to enable PCMSK0 scan
   PCMSK0 |= (1 << PCINT4); // Set PCINT4 (digital input 10) to trigger an interrupt on state change
@@ -58,9 +59,10 @@ void setup(){
   //Check the EEPROM signature to make sure that the setup program is executed.
   while(eeprom_data[33] != 'V' || eeprom_data[34] != 'B' || eeprom_data[35] != 'M'){
     delay(500);                                                                         //Wait for 500ms.
-    digitalWrite(12, !digitalRead(12));                                                 //Change the led status to indicate error.
+    digitalWrite(2, !digitalRead(2));                                                 //Change the led status to indicate error.
   }
-  wait_for_receiver();                                                                  //Wait until the receiver is active.
+  
+  wait_for_receiver_signals();                                                                  //Wait until the receiver is active.
   zero_timer = micros();                                                                //Set the zero_timer for the first loop.
 
   while(Serial.available())data = Serial.read();                                        //Empty the serial buffer.
@@ -219,14 +221,14 @@ void loop(){
           digitalWrite(12, !digitalRead(12));   //Change the led status to indicate calibration.
           Serial.print(".");
         }
-        gyro_signalen();                                                                //Read the gyro output.
+        read_gyro_data();                                                                //Read the gyro output.
         gyro_axis_cal[1] += gyro_axis[1];                                               //Ad roll value to gyro_roll_cal.
         gyro_axis_cal[2] += gyro_axis[2];                                               //Ad pitch value to gyro_pitch_cal.
         gyro_axis_cal[3] += gyro_axis[3];                                               //Ad yaw value to gyro_yaw_cal.
         //We don't want the esc's to be beeping annoyingly. So let's give them a 1000us puls while calibrating the gyro.
-        PORTD |= B11110000;                                                             //Set digital poort 4, 5, 6 and 7 high.
+        PORTA |= B11110000;                                                             //Set digital poort 26, 27, 28 and 29 high.
         delayMicroseconds(1000);                                                        //Wait 1000us.
-        PORTD &= B00001111;                                                             //Set digital poort 4, 5, 6 and 7 low.
+        PORTA &= B00001111;                                                             //Set digital poort 26, 27, 28 and 29 low.
         delay(3);                                                                       //Wait 3 milliseconds before the next loop.
       }
       Serial.println(".");
@@ -237,12 +239,12 @@ void loop(){
     }
     else{
       ///We don't want the esc's to be beeping annoyingly. So let's give them a 1000us puls while calibrating the gyro.
-      PORTD |= B11110000;                                                               //Set digital poort 4, 5, 6 and 7 high.
+      PORTA |= B11110000;                                                               //Set digital poort 26, 27, 28 and 29 high.
       delayMicroseconds(1000);                                                          //Wait 1000us.
-      PORTD &= B00001111;                                                               //Set digital poort 4, 5, 6 and 7 low.
+      PORTA &= B00001111;                                                               //Set digital poort 26, 27, 28 and 29 low.
 
       //Let's get the current gyro data.
-      gyro_signalen();
+      read_gyro_data();
 
       //Gyro angle calculations
       //0.0000611 = 1 / (250Hz / 65.5)
@@ -278,7 +280,7 @@ void loop(){
       if(loop_counter == 4)Serial.print(" Yaw: ");
       if(loop_counter == 5)Serial.println(gyro_yaw / 65.5 ,0);
 
-      loop_counter ++;
+      loop_counter++;
       if(loop_counter == 60)loop_counter = 0;      
     }
   }
@@ -286,57 +288,58 @@ void loop(){
 
 
 
-//This routine is called every time input 8, 9, 10 or 11 changed state.
-ISR(PCINT0_vect){
+//This routine is called every time input 10, 11, 12 and 13 changed state.
+ISR(PCINT0_vect) {
   current_time = micros();
   //Channel 1=========================================
-  if(PINB & B00000001){                                        //Is input 8 high?
-    if(last_channel_1 == 0){                                   //Input 8 changed from 0 to 1.
-      last_channel_1 = 1;                                      //Remember current input state.
-      timer_1 = current_time;                                  //Set timer_1 to current_time.
+  if (PINB & B00010000) {                                                   //Is input 10 high?
+    if (last_channel_1 == 0) {                                              //Input 10 changed from 0 to 1.
+      last_channel_1 = 1;                                                   //Remember current input state.
+      timer_1 = current_time;                                               //Set timer_1 to current_time.
     }
   }
-  else if(last_channel_1 == 1){                                //Input 8 is not high and changed from 1 to 0.
-    last_channel_1 = 0;                                        //Remember current input state.
-    receiver_input[1] = current_time - timer_1;                 //Channel 1 is current_time - timer_1.
+  else if (last_channel_1 == 1) {                                           //Input 10 is not high and changed from 1 to 0.
+    last_channel_1 = 0;                                                     //Remember current input state.
+    receiver_input[0] = current_time - timer_1;                             //Channel 1 is current_time - timer_1.
   }
   //Channel 2=========================================
-  if(PINB & B00000010 ){                                       //Is input 9 high?
-    if(last_channel_2 == 0){                                   //Input 9 changed from 0 to 1.
-      last_channel_2 = 1;                                      //Remember current input state.
-      timer_2 = current_time;                                  //Set timer_2 to current_time.
+  if (PINB & B00100000 ) {                                                  //Is input 11 high?
+    if (last_channel_2 == 0) {                                              //Input 11 changed from 0 to 1.
+      last_channel_2 = 1;                                                   //Remember current input state.
+      timer_2 = current_time;                                               //Set timer_2 to current_time.
     }
   }
-  else if(last_channel_2 == 1){                                //Input 9 is not high and changed from 1 to 0.
-    last_channel_2 = 0;                                        //Remember current input state.
-    receiver_input[2] = current_time - timer_2;                //Channel 2 is current_time - timer_2.
+  else if (last_channel_2 == 1) {                                           //Input 11 is not high and changed from 1 to 0.
+    last_channel_2 = 0;                                                     //Remember current input state.
+    receiver_input[1] = current_time - timer_2;                             //Channel 2 is current_time - timer_2.
   }
   //Channel 3=========================================
-  if(PINB & B00000100 ){                                       //Is input 10 high?
-    if(last_channel_3 == 0){                                   //Input 10 changed from 0 to 1.
-      last_channel_3 = 1;                                      //Remember current input state.
-      timer_3 = current_time;                                  //Set timer_3 to current_time.
+  if (PINB & B01000000 ) {                                                  //Is input 12 high?
+    if (last_channel_3 == 0) {                                              //Input 12 changed from 0 to 1.
+      last_channel_3 = 1;                                                   //Remember current input state.
+      timer_3 = current_time;                                               //Set timer_3 to current_time.
     }
   }
-  else if(last_channel_3 == 1){                                //Input 10 is not high and changed from 1 to 0.
-    last_channel_3 = 0;                                        //Remember current input state.
-    receiver_input[3] = current_time - timer_3;                //Channel 3 is current_time - timer_3.
+  else if (last_channel_3 == 1) {                                           //Input 12 is not high and changed from 1 to 0.
+    last_channel_3 = 0;                                                     //Remember current input state.
+    receiver_input[2] = current_time - timer_3;                             //Channel 3 is current_time - timer_3.
+
   }
   //Channel 4=========================================
-  if(PINB & B00001000 ){                                       //Is input 11 high?
-    if(last_channel_4 == 0){                                   //Input 11 changed from 0 to 1.
-      last_channel_4 = 1;                                      //Remember current input state.
-      timer_4 = current_time;                                  //Set timer_4 to current_time.
+  if (PINB & B10000000 ) {                                                  //Is input 13 high?
+    if (last_channel_4 == 0) {                                              //Input 13 changed from 0 to 1.
+      last_channel_4 = 1;                                                   //Remember current input state.
+      timer_4 = current_time;                                               //Set timer_4 to current_time.
     }
   }
-  else if(last_channel_4 == 1){                                //Input 11 is not high and changed from 1 to 0.
-    last_channel_4 = 0;                                        //Remember current input state.
-    receiver_input[4] = current_time - timer_4;                //Channel 4 is current_time - timer_4.
+  else if (last_channel_4 == 1) {                                           //Input 13 is not high and changed from 1 to 0.
+    last_channel_4 = 0;                                                     //Remember current input state.
+    receiver_input[3] = current_time - timer_4;                             //Channel 4 is current_time - timer_4.
   }
 }
 
 //Checck if the receiver values are valid within 10 seconds
-void wait_for_receiver(){
+void wait_for_receiver_signals(){
   byte zero = 0;                                                                //Set all bits in the variable zero to 0
   while(zero < 15){                                                             //Stay in this loop until the 4 lowest bits are set
     if(receiver_input[1] < 2100 && receiver_input[1] > 900)zero |= 0b00000001;  //Set bit 0 if the receiver pulse 1 is within the 900 - 2100 range
@@ -409,18 +412,18 @@ void print_signals(){
 
 void esc_pulse_output(){
   zero_timer = micros();
-  PORTD |= B11110000;                                            //Set port 4, 5, 6 and 7 high at once
-  timer_channel_1 = esc_1 + zero_timer;                          //Calculate the time when digital port 4 is set low.
-  timer_channel_2 = esc_2 + zero_timer;                          //Calculate the time when digital port 5 is set low.
-  timer_channel_3 = esc_3 + zero_timer;                          //Calculate the time when digital port 6 is set low.
-  timer_channel_4 = esc_4 + zero_timer;                          //Calculate the time when digital port 7 is set low.
+  PORTA |= B11110000;                                            //Set port 26, 27, 28 and 29 high at once
+  timer_channel_1 = esc_1 + zero_timer;                          //Calculate the time when digital port 26 is set low.
+  timer_channel_2 = esc_2 + zero_timer;                          //Calculate the time when digital port 27 is set low.
+  timer_channel_3 = esc_3 + zero_timer;                          //Calculate the time when digital port 28 is set low.
+  timer_channel_4 = esc_4 + zero_timer;                          //Calculate the time when digital port 29 is set low.
 
-  while(PORTD >= 16){                                            //Execute the loop until digital port 4 to 7 is low.
+  while(PORTA >= 16){                                            //Execute the loop until digital port 26 to 29 is low.
     esc_loop_timer = micros();                                   //Check the current time.
-    if(timer_channel_1 <= esc_loop_timer)PORTD &= B11101111;     //When the delay time is expired, digital port 4 is set low.
-    if(timer_channel_2 <= esc_loop_timer)PORTD &= B11011111;     //When the delay time is expired, digital port 5 is set low.
-    if(timer_channel_3 <= esc_loop_timer)PORTD &= B10111111;     //When the delay time is expired, digital port 6 is set low.
-    if(timer_channel_4 <= esc_loop_timer)PORTD &= B01111111;     //When the delay time is expired, digital port 7 is set low.
+    if(timer_channel_1 <= esc_loop_timer)PORTA &= B11101111;     //When the delay time is expired, digital port 26 is set low.
+    if(timer_channel_2 <= esc_loop_timer)PORTA &= B11011111;     //When the delay time is expired, digital port 27 is set low.
+    if(timer_channel_3 <= esc_loop_timer)PORTA &= B10111111;     //When the delay time is expired, digital port 28 is set low.
+    if(timer_channel_4 <= esc_loop_timer)PORTA &= B01111111;     //When the delay time is expired, digital port 29 is set low.
   }
 }
 
@@ -461,7 +464,7 @@ void set_gyro_registers(){
   }  
 }
 
-void gyro_signalen(){
+void read_gyro_data(){
   //Read the MPU-6050
   if(eeprom_data[31] == 1){
     Wire.beginTransmission(gyro_address);                        //Start communication with the gyro.
