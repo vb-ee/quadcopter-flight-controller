@@ -1,9 +1,10 @@
 #include <Wire.h>
+#include <EEPROM.h>
 
-#define throt 0
-#define pitch 1
-#define roll 2
-#define yaw 3
+#define throt 1
+#define pitch 2
+#define roll 3
+#define yaw 4
 
 #define stopped 0
 #define starting 1
@@ -11,22 +12,23 @@
 
 #define refresh_rate 250
 
-volatile int receiver_input[4];
-volatile int pulse_length[4];
+byte eeprom_data[36];
+volatile int receiver_input[5];
+volatile int pulse_length[5];
 volatile unsigned long timer_1, timer_2, timer_3, timer_4, current_time;
 volatile byte last_channel_1, last_channel_2, last_channel_3, last_channel_4;
 
-float accel_x, accel_y, accel_z; 
-float gyro_x, gyro_y, gyro_z;
-float gyro_x_avg, gyro_y_avg, gyro_z_avg;
+float accel_axis[4], gyro_axis[4]; 
+double gyro_avg[4];
 float acc_pitch_angle, acc_roll_angle;
+float accel_x, accel_y, accel_z, accel_vec_mag;
+double gyro_pitch, gyro_roll, gyro_yaw;
 
-float gyro_roll, gyro_pitch, gyro_yaw;
+///
 float pitch_angle, roll_angle, yaw_angle;
 float measured_pitch, measured_roll, measured_yaw;
 
 int temp;
-float accel_vec_mag;
 boolean gyro_angle_set;
 
 unsigned long int loop_timer, time_diff;
@@ -49,30 +51,36 @@ float pitch_error, roll_error, yaw_error;
 float pitch_pid_i, roll_pid_i, yaw_pid_i;
 float previous_pitch_error, previous_roll_error, previous_yaw_error;
 
-int throttle;
-int battery_voltage;
+int throttle, battery_voltage, counter, gyro_address;
 float pid_max = 400;
-int led_pin = 2;
-int counter;
 
 int status = stopped;
 
 void setup() {
+  Serial.begin(57600);
+
+  for (counter = 0; counter <= 35; counter++)eeprom_data[counter] = EEPROM.read(counter);
+  counter = 0;
+
+  gyro_address = eeprom_data[32];
+  
   Wire.begin();
   TWBR = 12; // Set I2C clock frequency to 400kHz
-  Serial.begin(57600);
    
-  DDRB |= B11110000; // Set 4, 5, 6, 7 pins as outputs
-  pinMode(led_pin, OUTPUT); // Change this line to port manipulation
+  DDRA |= B11110000; // Set 26, 27, 28 and 29 pins as outputs
+  DDRE |= B00001000; //Configure digital poort 2 as output.
   
-  digitalWrite(led_pin, HIGH);
+  digitalWrite(2, HIGH);
+
+  //Check the EEPROM signature to make sure that the setup program is executed.
+  while (eeprom_data[33] != 'V' || eeprom_data[34] != 'B' || eeprom_data[35] != 'M')delay(10);
 
   set_mpu6050();
 
   for (int i = 0; i < 1250 ; i++) { //Wait 5 seconds before continuing.
-    PORTB |= B11110000;             //Set digital ports 4, 5, 6 and 7 high.
+    PORTA |= B11110000;             //Set digital ports 26, 27, 28 and 29 high.
     delayMicroseconds(1000);                                                
-    PORTB &= B00001111;             //Set digital ports 4, 5, 6 and 7 low.
+    PORTA &= B00001111;             //Set digital ports 26, 27, 28 and 29 low.
     delayMicroseconds(3000);                                                
   }
   
@@ -84,31 +92,33 @@ void setup() {
   PCMSK0 |= (1 << PCINT6); // Set PCINT6 (digital input 12)to trigger an interrupt on state change
   PCMSK0 |= (1 << PCINT7); // Set PCINT7 (digital input 13)to trigger an interrupt on state change
 
-  while (pulse_length[throt] < 990 || pulse_length[throttle] > 1020 || pulse_length[yaw] < 1400) {
-      pulse_length[throt] = convert_receiver_input(3);                 //Convert the actual receiver signals for throttle to the standard 1000 - 2000us
-      pulse_length[yaw] = convert_receiver_input(4);                 //Convert the actual receiver signals for yaw to the standard 1000 - 2000us
-    counter++;                                                               //While waiting increment start whith every loop.
+  while (pulse_length[throt] < 990 || pulse_length[throt] > 1020 || pulse_length[yaw] < 1400) {
+    pulse_length[throt] = convert_receiver_input(3);                        //Convert the actual receiver signals for throttle to the standard 1000 - 2000us
+    pulse_length[yaw] = convert_receiver_input(4);                          //Convert the actual receiver signals for yaw to the standard 1000 - 2000us
+    counter++;                                                              //While waiting increment start whith every loop.
     //We don't want the esc's to be beeping annoyingly. So let's give them a 1000us puls while waiting for the receiver inputs.
-    PORTB |= B11110000;                                                     //Set digital poort 4, 5, 6 and 7 high.
+    PORTA |= B11110000;                                                     //Set digital poort 26, 27, 28 and 29 high.
     delayMicroseconds(1000);                                                //Wait 1000us.
-    PORTB &= B00001111;                                                     //Set digital poort 4, 5, 6 and 7 low.
+    PORTA &= B00001111;                                                     //Set digital poort 26, 27, 28 and 29 low.
     delay(3);                                                               //Wait 3 milliseconds before the next loop.
-    if (counter == 125) {                                                     //Every 125 loops (500ms).
-      digitalWrite(led_pin, !digitalRead(led_pin));                                   //Change the led status.
-      counter = 0;                                                            //Start again at 0.
+    if (counter == 125) {                                                   //Every 125 loops (500ms).
+      digitalWrite(2, !digitalRead(2));                                     //Change the led status.
+      counter = 0;                                                          //Start again at 0.
     }
   }
+
+  counter = 0;
     
   battery_voltage = (analogRead(0) + 65) * 1.2317;
 
   loop_timer = micros();
   
-  digitalWrite(led_pin, LOW);
+  digitalWrite(2, LOW);
 }
 
 
 void loop() {   
-  read_mpu();
+  read_mpu6050();
 
   calculate_angles();
 
@@ -116,13 +126,7 @@ void loop() {
 
   calculate_pid();
   
-  if (is_started()) {
-
-  pid_control();
-
-// For now we use static power supply not battery, so we dont need this function
-//  compensate_battery(); 
-  }
+  if (is_started()) pid_control();
 
 
   run_motors();
@@ -159,7 +163,7 @@ void set_mpu6050() {
 }
 
 
-void read_mpu() {
+void read_mpu6050() {
   Wire.beginTransmission(0x68);
   Wire.write(0x3B);
   Wire.endTransmission();
@@ -168,58 +172,72 @@ void read_mpu() {
   convert_receiver_signals();
   
   while (Wire.available() < 14);
-  accel_x = Wire.read() << 8 | Wire.read();
-  accel_y = Wire.read() << 8 | Wire.read();
-  accel_z = Wire.read() << 8 | Wire.read();
+  accel_axis[1] = Wire.read() << 8 | Wire.read();
+  accel_axis[2] = Wire.read() << 8 | Wire.read();
+  accel_axis[3] = Wire.read() << 8 | Wire.read();
   temp = Wire.read() << 8 | Wire.read();
-  gyro_x = Wire.read() << 8 | Wire.read();
-  gyro_y = Wire.read() << 8 | Wire.read();
-  gyro_z = Wire.read() << 8 | Wire.read();
+  gyro_axis[1] = Wire.read() << 8 | Wire.read();
+  gyro_axis[2] = Wire.read() << 8 | Wire.read();
+  gyro_axis[3] = Wire.read() << 8 | Wire.read();
+
+  gyro_roll = gyro_axis[eeprom_data[28] & 0b00000011];                      //Set gyro_roll to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[28] & 0b10000000)gyro_roll *= -1;                         //Invert gyro_roll if the MSB of EEPROM bit 28 is set.
+  gyro_pitch = gyro_axis[eeprom_data[29] & 0b00000011];                     //Set gyro_pitch to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[29] & 0b10000000)gyro_pitch *= -1;                        //Invert gyro_pitch if the MSB of EEPROM bit 29 is set.
+  gyro_yaw = gyro_axis[eeprom_data[30] & 0b00000011];                       //Set gyro_axis[2]aw to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[30] & 0b10000000)gyro_yaw *= -1;                          //Invert gyro_axis[2]aw if the MSB of EEPROM bit 30 is set.
+
+  acc_x = acc_axis[eeprom_data[29] & 0b00000011];                           //Set acc_x to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[29] & 0b10000000)acc_x *= -1;                             //Invert acc_x if the MSB of EEPROM bit 29 is set.
+  acc_y = acc_axis[eeprom_data[28] & 0b00000011];                           //Set acc_y to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[28] & 0b10000000)acc_y *= -1;                             //Invert acc_y if the MSB of EEPROM bit 28 is set.
+  acc_z = acc_axis[eeprom_data[30] & 0b00000011];                           //Set acc_z to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[30] & 0b10000000)acc_z *= -1;                             //Invert acc_z if the MSB of EEPROM bit 30 is set.
 }
 
 
 void calibrate_gyro() {
   for (int i = 0; i < 2000; i++) {
-    if (i % 15 == 0) digitalWrite(led_pin, !digitalRead(led_pin));  // Change the led status to indicate calibration.
-    read_mpu();
-    gyro_x_avg += gyro_x;
-    gyro_y_avg += gyro_y;
-    gyro_z_avg += gyro_z;
+    if (i % 15 == 0) digitalWrite(2, !digitalRead(2));  // Change the led status to indicate calibration.
+    read_mpu6050();
+    gyro_avg[1] += gyro_axis[1];
+    gyro_avg[2] += gyro_axis[2];
+    gyro_avg[3] += gyro_axis[3];
 
     // Preventing esc beeps during calibration
-    PORTB |= B11110000; // Set pins 4, 5, 6, 7 to high 
+    PORTA |= B11110000; // Set pins 26, 27, 28 and 29 to high 
     delayMicroseconds(1000);
-    PORTB &= B00001111; // Set pins 4, 5, 6, 7 to low
+    PORTA &= B00001111; // Set pins 26, 27, 28 and 29 to low
     delay(3);
   }
 
-  gyro_x_avg /= 2000;
-  gyro_y_avg /= 2000;
-  gyro_z_avg /= 2000;
+  gyro_avg[1] /= 2000;
+  gyro_avg[2] /= 2000;
+  gyro_avg[3] /= 2000;
 }
 
 
 void calculate_gyro_angles() {
-  gyro_x -= gyro_x_avg;
-  gyro_y -= gyro_y_avg;
-  gyro_z -= gyro_z_avg;
+  gyro_axis[1] -= gyro_avg[1];
+  gyro_axis[2] -= gyro_avg[2];
+  gyro_axis[3] -= gyro_avg[3];
 
-  pitch_angle += (gyro_y / (refresh_rate * 65.5));
-  roll_angle += (gyro_x / (refresh_rate * 65.5));
+  pitch_angle += (gyro_axis[2] / (refresh_rate * 65.5));
+  roll_angle += (gyro_axis[1] / (refresh_rate * 65.5));
 
-  pitch_angle -= roll_angle * sin(gyro_z * (PI / (refresh_rate * 65.5 * 180)));
-  roll_angle += pitch_angle * sin(gyro_z * (PI / (refresh_rate * 65.5 * 180)));
+  pitch_angle -= roll_angle * sin(gyro_axis[3] * (PI / (refresh_rate * 65.5 * 180)));
+  roll_angle += pitch_angle * sin(gyro_axis[3] * (PI / (refresh_rate * 65.5 * 180)));
 }
 
 
 void calculate_accel_angles() {
-  accel_vec_mag = sqrt((accel_x * accel_x) + (accel_y * accel_y) + (accel_z * accel_z));
+  accel_vec_mag = sqrt((accel_axis[1] * accel_axis[1]) + (accel_axis[2] * accel_axis[2]) + (accel_axis[3] * accel_axis[3]));
 
-  if (abs(accel_x) < accel_vec_mag) {
-    acc_pitch_angle = asin((float)accel_x / accel_vec_mag) * -(180 / PI);
+  if (abs(accel_axis[1]) < accel_vec_mag) {
+    acc_pitch_angle = asin((float)accel_axis[1] / accel_vec_mag) * -(180 / PI);
   }
-  if (abs(accel_y) < accel_vec_mag) {
-    acc_roll_angle = asin((float)accel_y / accel_vec_mag) * (180 / PI);
+  if (abs(accel_axis[2]) < accel_vec_mag) {
+    acc_roll_angle = asin((float)accel_axis[2] / accel_vec_mag) * (180 / PI);
   }
 }
 
@@ -239,11 +257,11 @@ void calculate_angles() {
 
 //  measured_pitch = measured_pitch * 0.9 + pitch_angle * 0.1;
 //  measured_roll = measured_roll * 0.9 + roll_angle * 0.1;
-//  measured_yaw = -gyro_z / 65.5;
+//  measured_yaw = -gyro_axis[3] / 65.5;
 
-  gyro_pitch = 0.7 * gyro_pitch + 0.3 * gyro_y / 65.5;
-  gyro_roll = 0.7 * gyro_roll + 0.3 * gyro_x / 65.5;
-  gyro_yaw = 0.7 * gyro_yaw + 0.3 * gyro_z / 65.5;
+  gyro_pitch = 0.7 * gyro_pitch + 0.3 * gyro_axis[2] / 65.5;
+  gyro_roll = 0.7 * gyro_roll + 0.3 * gyro_axis[1] / 65.5;
+  gyro_yaw = 0.7 * gyro_yaw + 0.3 * gyro_axis[3] / 65.5;
 }
 
 
@@ -271,7 +289,7 @@ float calculate_setpoint(float out_angle, int channel_pulse) {
   }
 
   setpoint -= level_adjust;
-  setpoint /= 3;
+  setpoint /= 3.0;
 
   return setpoint;
 }
@@ -372,6 +390,8 @@ void pid_control() {
   esc3 = throttle - roll_pid - pitch_pid - yaw_pid;
   esc4 = throttle + roll_pid - pitch_pid + yaw_pid;
 
+//  compensate_battery();
+
   if (esc1 < 1100) esc1 = 1100;
   if (esc2 < 1100) esc2 = 1100;
   if (esc3 < 1100) esc3 = 1100;
@@ -385,19 +405,19 @@ void pid_control() {
 
 
 void run_motors() {
-  if (micros() - loop_timer > 4050)digitalWrite(led_pin, HIGH);
+  if (micros() - loop_timer > 4050)digitalWrite(2, HIGH);
   while (micros() - loop_timer < 4000);
   loop_timer = micros();
 
-  PORTB |= B11110000;
+  PORTA |= B11110000;
 
-  while (PORTB >= 16) {
+  while (PORTA >= 16) {
     time_diff = micros();
     time_diff -= loop_timer;
-    if (time_diff >= esc1) PORTB &= B11101111;
-    if (time_diff >= esc2) PORTB &= B11011111;
-    if (time_diff >= esc3) PORTB &= B10111111;
-    if (time_diff >= esc4) PORTB &= B01111111;
+    if (time_diff >= esc1) PORTA &= B11101111;
+    if (time_diff >= esc2) PORTA &= B11011111;
+    if (time_diff >= esc3) PORTA &= B10111111;
+    if (time_diff >= esc4) PORTA &= B01111111;
   }
 }
 
@@ -408,7 +428,7 @@ bool battery_connected() {
 }
 
 void compensate_battery() {
-  if (battery_voltage < 1000 && battery_voltage > 600)digitalWrite(led_pin, HIGH);
+  if (battery_voltage < 1000 && battery_voltage > 600)digitalWrite(2, HIGH);
   if (battery_connected()) {
     esc1 += esc1 * ((1240 - battery_voltage) / (float) 3500);
     esc2 += esc2 * ((1240 - battery_voltage) / (float) 3500);
@@ -417,8 +437,33 @@ void compensate_battery() {
   }
 }
 
-int convert_receiver_input(byte channel) {
-                
+int convert_receiver_input(byte function) {
+  byte channel, reverse;                                                       //First we declare some local variables
+  int low, center, high, actual;
+  int difference;
+
+  channel = eeprom_data[function + 23] & 0b00000111;                           //What channel corresponds with the specific function
+  if (eeprom_data[function + 23] & 0b10000000)reverse = 1;                     //Reverse channel when most significant bit is set
+  else reverse = 0;                                                            //If the most significant is not set there is no reverse
+
+  actual = receiver_input[channel];                                            //Read the actual receiver value for the corresponding function
+  low = (eeprom_data[channel * 2 + 15] << 8) | eeprom_data[channel * 2 + 14];  //Store the low value for the specific receiver input channel
+  center = (eeprom_data[channel * 2 - 1] << 8) | eeprom_data[channel * 2 - 2]; //Store the center value for the specific receiver input channel
+  high = (eeprom_data[channel * 2 + 7] << 8) | eeprom_data[channel * 2 + 6];   //Store the high value for the specific receiver input channel
+
+  if (actual < center) {                                                       //The actual receiver value is lower than the center value
+    if (actual < low)actual = low;                                             //Limit the lowest value to the value that was detected during setup
+    difference = ((long)(center - actual) * (long)500) / (center - low);       //Calculate and scale the actual value to a 1000 - 2000us value
+    if (reverse == 1)return 1500 + difference;                                 //If the channel is reversed
+    else return 1500 - difference;                                             //If the channel is not reversed
+  }
+  else if (actual > center) {                                                                      //The actual receiver value is higher than the center value
+    if (actual > high)actual = high;                                           //Limit the lowest value to the value that was detected during setup
+    difference = ((long)(actual - center) * (long)500) / (high - center);      //Calculate and scale the actual value to a 1000 - 2000us value
+    if (reverse == 1)return 1500 - difference;                                 //If the channel is reversed
+    else return 1500 + difference;                                             //If the channel is not reversed
+  }
+  else return 1500;
 }
 
 void convert_receiver_signals() {
@@ -439,7 +484,7 @@ ISR(PCINT0_vect) {
   }
   else if (last_channel_1 == 1) {                                           //Input 10 is not high and changed from 1 to 0.
     last_channel_1 = 0;                                                     //Remember current input state.
-    receiver_input[0] = current_time - timer_1;                             //Channel 1 is current_time - timer_1.
+    receiver_input[1] = current_time - timer_1;                             //Channel 1 is current_time - timer_1.
   }
   //Channel 2=========================================
   if (PINB & B00100000 ) {                                                  //Is input 11 high?
@@ -450,7 +495,7 @@ ISR(PCINT0_vect) {
   }
   else if (last_channel_2 == 1) {                                           //Input 11 is not high and changed from 1 to 0.
     last_channel_2 = 0;                                                     //Remember current input state.
-    receiver_input[1] = current_time - timer_2;                             //Channel 2 is current_time - timer_2.
+    receiver_input[2] = current_time - timer_2;                             //Channel 2 is current_time - timer_2.
   }
   //Channel 3=========================================
   if (PINB & B01000000 ) {                                                  //Is input 12 high?
@@ -461,7 +506,7 @@ ISR(PCINT0_vect) {
   }
   else if (last_channel_3 == 1) {                                           //Input 12 is not high and changed from 1 to 0.
     last_channel_3 = 0;                                                     //Remember current input state.
-    receiver_input[2] = current_time - timer_3;                             //Channel 3 is current_time - timer_3.
+    receiver_input[3] = current_time - timer_3;                             //Channel 3 is current_time - timer_3.
 
   }
   //Channel 4=========================================
@@ -473,7 +518,7 @@ ISR(PCINT0_vect) {
   }
   else if (last_channel_4 == 1) {                                           //Input 13 is not high and changed from 1 to 0.
     last_channel_4 = 0;                                                     //Remember current input state.
-    receiver_input[3] = current_time - timer_4;                             //Channel 4 is current_time - timer_4.
+    receiver_input[4] = current_time - timer_4;                             //Channel 4 is current_time - timer_4.
   }
 }
 
