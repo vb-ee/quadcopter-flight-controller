@@ -23,10 +23,7 @@ double gyro_avg[4];
 float acc_pitch_angle, acc_roll_angle;
 float accel_x, accel_y, accel_z, accel_vec_mag;
 double gyro_pitch, gyro_roll, gyro_yaw;
-
-///
 float pitch_angle, roll_angle, yaw_angle;
-float measured_pitch, measured_roll, measured_yaw;
 
 int temp;
 boolean gyro_angle_set;
@@ -35,16 +32,17 @@ unsigned long int loop_timer, time_diff;
 unsigned long int esc1, esc2, esc3, esc4;
 
 float roll_setpoint, pitch_setpoint, yaw_setpoint;
+float roll_input, pitch_input, yaw_input;
 
-float kp_roll = 1.2;
-float ki_roll = 0.05;
-float kd_roll = 18;
+float kp_roll = 1.3;
+float ki_roll = 0.04;
+float kd_roll = 18.0;
 float kp_pitch = kp_roll;
 float ki_pitch = ki_roll;
 float kd_pitch = kd_roll;
-float kp_yaw = 3;
+float kp_yaw = 4.0;
 float ki_yaw = 0.02;
-float kd_yaw = 0;
+float kd_yaw = 0.0;
 
 float roll_pid, pitch_pid, yaw_pid;
 float pitch_error, roll_error, yaw_error;
@@ -52,7 +50,7 @@ float pitch_pid_i, roll_pid_i, yaw_pid_i;
 float previous_pitch_error, previous_roll_error, previous_yaw_error;
 
 int throttle, battery_voltage, counter, gyro_address;
-float pid_max = 400;
+int pid_max = 400;
 
 int status = stopped;
 
@@ -93,8 +91,8 @@ void setup() {
   PCMSK0 |= (1 << PCINT7); // Set PCINT7 (digital input 13)to trigger an interrupt on state change
 
   while (pulse_length[throt] < 990 || pulse_length[throt] > 1020 || pulse_length[yaw] < 1400) {
-    pulse_length[throt] = convert_receiver_input(3);                        //Convert the actual receiver signals for throttle to the standard 1000 - 2000us
-    pulse_length[yaw] = convert_receiver_input(4);                          //Convert the actual receiver signals for yaw to the standard 1000 - 2000us
+    pulse_length[throt] = convert_receiver_input(throt);                        //Convert the actual receiver signals for throttle to the standard 1000 - 2000us
+    pulse_length[yaw] = convert_receiver_input(yaw);                          //Convert the actual receiver signals for yaw to the standard 1000 - 2000us
     counter++;                                                              //While waiting increment start whith every loop.
     //We don't want the esc's to be beeping annoyingly. So let's give them a 1000us puls while waiting for the receiver inputs.
     PORTA |= B11110000;                                                     //Set digital poort 26, 27, 28 and 29 high.
@@ -187,12 +185,12 @@ void read_mpu6050() {
   gyro_yaw = gyro_axis[eeprom_data[30] & 0b00000011];                       //Set gyro_axis[2]aw to the correct axis that was stored in the EEPROM.
   if (eeprom_data[30] & 0b10000000)gyro_yaw *= -1;                          //Invert gyro_axis[2]aw if the MSB of EEPROM bit 30 is set.
 
-  acc_x = acc_axis[eeprom_data[29] & 0b00000011];                           //Set acc_x to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[29] & 0b10000000)acc_x *= -1;                             //Invert acc_x if the MSB of EEPROM bit 29 is set.
-  acc_y = acc_axis[eeprom_data[28] & 0b00000011];                           //Set acc_y to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[28] & 0b10000000)acc_y *= -1;                             //Invert acc_y if the MSB of EEPROM bit 28 is set.
-  acc_z = acc_axis[eeprom_data[30] & 0b00000011];                           //Set acc_z to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[30] & 0b10000000)acc_z *= -1;                             //Invert acc_z if the MSB of EEPROM bit 30 is set.
+  accel_x = accel_axis[eeprom_data[29] & 0b00000011];                           //Set acc_x to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[29] & 0b10000000)accel_x *= -1;                             //Invert acc_x if the MSB of EEPROM bit 29 is set.
+  accel_y = accel_axis[eeprom_data[28] & 0b00000011];                           //Set acc_y to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[28] & 0b10000000)accel_y *= -1;                             //Invert acc_y if the MSB of EEPROM bit 28 is set.
+  accel_z = accel_axis[eeprom_data[30] & 0b00000011];                           //Set acc_z to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[30] & 0b10000000)accel_z *= -1;                             //Invert acc_z if the MSB of EEPROM bit 30 is set.
 }
 
 
@@ -222,22 +220,22 @@ void calculate_gyro_angles() {
   gyro_axis[2] -= gyro_avg[2];
   gyro_axis[3] -= gyro_avg[3];
 
-  pitch_angle += (gyro_axis[2] / (refresh_rate * 65.5));
-  roll_angle += (gyro_axis[1] / (refresh_rate * 65.5));
+  pitch_angle += (gyro_pitch / (refresh_rate * 65.5));
+  roll_angle += (gyro_roll / (refresh_rate * 65.5));
 
-  pitch_angle -= roll_angle * sin(gyro_axis[3] * (PI / (refresh_rate * 65.5 * 180)));
-  roll_angle += pitch_angle * sin(gyro_axis[3] * (PI / (refresh_rate * 65.5 * 180)));
+  pitch_angle -= roll_angle * sin(gyro_yaw * (PI / (refresh_rate * 65.5 * 180)));
+  roll_angle += pitch_angle * sin(gyro_yaw * (PI / (refresh_rate * 65.5 * 180)));
 }
 
 
 void calculate_accel_angles() {
-  accel_vec_mag = sqrt((accel_axis[1] * accel_axis[1]) + (accel_axis[2] * accel_axis[2]) + (accel_axis[3] * accel_axis[3]));
+  accel_vec_mag = sqrt((accel_x * accel_x) + (accel_y * accel_y) + (accel_z * accel_z));
 
-  if (abs(accel_axis[1]) < accel_vec_mag) {
-    acc_pitch_angle = asin((float)accel_axis[1] / accel_vec_mag) * -(180 / PI);
+  if (abs(accel_y) < accel_vec_mag) {
+    acc_pitch_angle = asin((float)accel_y / accel_vec_mag) * (180 / PI);
   }
-  if (abs(accel_axis[2]) < accel_vec_mag) {
-    acc_roll_angle = asin((float)accel_axis[2] / accel_vec_mag) * (180 / PI);
+  if (abs(accel_x) < accel_vec_mag) {
+    acc_roll_angle = asin((float)accel_x / accel_vec_mag) * -(180 / PI);
   }
 }
 
@@ -255,13 +253,9 @@ void calculate_angles() {
     gyro_angle_set = true;
   }
 
-//  measured_pitch = measured_pitch * 0.9 + pitch_angle * 0.1;
-//  measured_roll = measured_roll * 0.9 + roll_angle * 0.1;
-//  measured_yaw = -gyro_axis[3] / 65.5;
-
-  gyro_pitch = 0.7 * gyro_pitch + 0.3 * gyro_axis[2] / 65.5;
-  gyro_roll = 0.7 * gyro_roll + 0.3 * gyro_axis[1] / 65.5;
-  gyro_yaw = 0.7 * gyro_yaw + 0.3 * gyro_axis[3] / 65.5;
+  pitch_input = 0.7 * pitch_input + 0.3 * gyro_pitch / 65.5;
+  roll_input = 0.7 * roll_input + 0.3 * gyro_roll / 65.5;
+  yaw_input = 0.7 * yaw_input + 0.3 * gyro_yaw / 65.5;
 }
 
 
@@ -272,8 +266,8 @@ void reset_gyro_angles() {
 
 
 void calculate_setpoints() {
-  pitch_setpoint = calculate_setpoint(measured_pitch, pulse_length[pitch]);
-  roll_setpoint = calculate_setpoint(measured_roll, pulse_length[roll]);
+  pitch_setpoint = calculate_setpoint(pitch_angle, pulse_length[pitch]);
+  roll_setpoint = calculate_setpoint(roll_angle, pulse_length[roll]);
   yaw_setpoint = calculate_yaw_setpoint(pulse_length[yaw], pulse_length[throt]);
 }
 
@@ -352,7 +346,7 @@ void stop_all() {
 
 
 void calculate_pid() {
-  roll_error = gyro_roll - roll_setpoint;
+  roll_error = roll_input - roll_setpoint;
   roll_pid_i += ki_roll * roll_error;
   if (roll_pid_i > pid_max)roll_pid_i = pid_max;
   else if (roll_pid_i < -pid_max)roll_pid_i = -pid_max;
@@ -361,7 +355,7 @@ void calculate_pid() {
   else if (roll_pid < -pid_max)roll_pid = -pid_max;
   previous_roll_error = roll_error;
 
-  pitch_error = gyro_pitch - pitch_setpoint;
+  pitch_error = pitch_input - pitch_setpoint;
   pitch_pid_i += ki_pitch * pitch_error;
   if (pitch_pid_i > pid_max)pitch_pid_i = pid_max;
   else if (pitch_pid_i < -pid_max)pitch_pid_i = -pid_max;
@@ -370,7 +364,7 @@ void calculate_pid() {
   else if (pitch_pid < -pid_max)pitch_pid = -pid_max;
   previous_pitch_error = pitch_error;
 
-  yaw_error = gyro_yaw - yaw_setpoint;
+  yaw_error = yaw_input - yaw_setpoint;
   yaw_pid_i += ki_yaw * yaw_error;
   if (yaw_pid_i > pid_max)yaw_pid_i = pid_max;
   else if (yaw_pid_i < -pid_max)yaw_pid_i = -pid_max;
