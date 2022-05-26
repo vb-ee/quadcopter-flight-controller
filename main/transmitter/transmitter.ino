@@ -16,7 +16,7 @@ struct QuadData {
 QuadData quad_data;
 
 void reset_data() {
-  quad_data.throttle = 0;
+  quad_data.throttle = 127;
   quad_data.pitch = 127;
   quad_data.roll = 127;
   quad_data.yaw = 127;
@@ -56,7 +56,7 @@ void loop()
   radio.write(&quad_data, sizeof(QuadData));
 }
 
-void printJoustickValues() {
+void printJoystickValues() {
   Serial.print(analogRead(A0));
   Serial.print(' ');
   Serial.print(analogRead(A1));

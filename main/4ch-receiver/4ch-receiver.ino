@@ -29,7 +29,7 @@ struct QuadData {
 QuadData quad_data;
 
 void reset_data() {
-  quad_data.throttle = 0;
+  quad_data.throttle = 127;
   quad_data.pitch = 127;
   quad_data.roll = 127;
   quad_data.yaw = 127;
@@ -77,7 +77,7 @@ void loop() {
   channel_3.writeMicroseconds(ch3_pulse);  
   channel_4.writeMicroseconds(ch4_pulse);  
   
-  print_data();
+//  print_data();
 }
 
 void receive_data()
