@@ -177,20 +177,6 @@ void read_mpu6050() {
   gyro_axis[1] = Wire.read() << 8 | Wire.read();
   gyro_axis[2] = Wire.read() << 8 | Wire.read();
   gyro_axis[3] = Wire.read() << 8 | Wire.read();
-
-  gyro_roll = gyro_axis[eeprom_data[28] & 0b00000011];                      //Set gyro_roll to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[28] & 0b10000000)gyro_roll *= -1;                         //Invert gyro_roll if the MSB of EEPROM bit 28 is set.
-  gyro_pitch = gyro_axis[eeprom_data[29] & 0b00000011];                     //Set gyro_pitch to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[29] & 0b10000000)gyro_pitch *= -1;                        //Invert gyro_pitch if the MSB of EEPROM bit 29 is set.
-  gyro_yaw = gyro_axis[eeprom_data[30] & 0b00000011];                       //Set gyro_axis[2]aw to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[30] & 0b10000000)gyro_yaw *= -1;                          //Invert gyro_axis[2]aw if the MSB of EEPROM bit 30 is set.
-
-  accel_x = accel_axis[eeprom_data[29] & 0b00000011];                           //Set acc_x to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[29] & 0b10000000)accel_x *= -1;                             //Invert acc_x if the MSB of EEPROM bit 29 is set.
-  accel_y = accel_axis[eeprom_data[28] & 0b00000011];                           //Set acc_y to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[28] & 0b10000000)accel_y *= -1;                             //Invert acc_y if the MSB of EEPROM bit 28 is set.
-  accel_z = accel_axis[eeprom_data[30] & 0b00000011];                           //Set acc_z to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[30] & 0b10000000)accel_z *= -1;                             //Invert acc_z if the MSB of EEPROM bit 30 is set.
 }
 
 
@@ -220,6 +206,14 @@ void calculate_gyro_angles() {
   gyro_axis[2] -= gyro_avg[2];
   gyro_axis[3] -= gyro_avg[3];
 
+  gyro_roll = gyro_axis[eeprom_data[28] & 0b00000011];                      //Set gyro_roll to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[28] & 0b10000000)gyro_roll *= -1;                         //Invert gyro_roll if the MSB of EEPROM bit 28 is set.
+  gyro_pitch = gyro_axis[eeprom_data[29] & 0b00000011];                     //Set gyro_pitch to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[29] & 0b10000000)gyro_pitch *= -1;                        //Invert gyro_pitch if the MSB of EEPROM bit 29 is set.
+  gyro_yaw = gyro_axis[eeprom_data[30] & 0b00000011];                       //Set gyro_axis[2]aw to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[30] & 0b10000000)gyro_yaw *= -1;                          //Invert gyro_axis[2]aw if the MSB of EEPROM bit 30 is set.
+
+  
   pitch_angle += (gyro_pitch / (refresh_rate * 65.5));
   roll_angle += (gyro_roll / (refresh_rate * 65.5));
 
@@ -229,6 +223,13 @@ void calculate_gyro_angles() {
 
 
 void calculate_accel_angles() {
+  accel_x = accel_axis[eeprom_data[29] & 0b00000011];                           //Set acc_x to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[29] & 0b10000000)accel_x *= -1;                             //Invert acc_x if the MSB of EEPROM bit 29 is set.
+  accel_y = accel_axis[eeprom_data[28] & 0b00000011];                           //Set acc_y to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[28] & 0b10000000)accel_y *= -1;                             //Invert acc_y if the MSB of EEPROM bit 28 is set.
+  accel_z = accel_axis[eeprom_data[30] & 0b00000011];                           //Set acc_z to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[30] & 0b10000000)accel_z *= -1;                             //Invert acc_z if the MSB of EEPROM bit 30 is set.
+  
   accel_vec_mag = sqrt((accel_x * accel_x) + (accel_y * accel_y) + (accel_z * accel_z));
 
   if (abs(accel_y) < accel_vec_mag) {
