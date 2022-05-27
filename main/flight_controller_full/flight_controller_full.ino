@@ -174,8 +174,8 @@ void read_mpu6050() {
   accel_axis[2] = Wire.read() << 8 | Wire.read();
   accel_axis[3] = Wire.read() << 8 | Wire.read();
   temp = Wire.read() << 8 | Wire.read();
-  gyro_axis[1] = Wire.read() << 8 | Wire.read();
   gyro_axis[2] = Wire.read() << 8 | Wire.read();
+  gyro_axis[1] = Wire.read() << 8 | Wire.read();
   gyro_axis[3] = Wire.read() << 8 | Wire.read();
 }
 
@@ -217,8 +217,8 @@ void calculate_gyro_angles() {
   pitch_angle += (gyro_pitch / (refresh_rate * 65.5));
   roll_angle += (gyro_roll / (refresh_rate * 65.5));
 
-  pitch_angle -= roll_angle * sin(gyro_yaw * (PI / (refresh_rate * 65.5 * 180)));
-  roll_angle += pitch_angle * sin(gyro_yaw * (PI / (refresh_rate * 65.5 * 180)));
+  pitch_angle += roll_angle * sin(gyro_yaw * (PI / (refresh_rate * 65.5 * 180)));
+  roll_angle -= pitch_angle * sin(gyro_yaw * (PI / (refresh_rate * 65.5 * 180)));
 }
 
 
@@ -232,11 +232,11 @@ void calculate_accel_angles() {
   
   accel_vec_mag = sqrt((accel_x * accel_x) + (accel_y * accel_y) + (accel_z * accel_z));
 
-  if (abs(accel_y) < accel_vec_mag) {
-    acc_pitch_angle = asin((float)accel_y / accel_vec_mag) * (180 / PI);
-  }
   if (abs(accel_x) < accel_vec_mag) {
-    acc_roll_angle = asin((float)accel_x / accel_vec_mag) * -(180 / PI);
+    acc_pitch_angle = asin((float)accel_x / accel_vec_mag) * (180 / PI);
+  }
+  if (abs(accel_y) < accel_vec_mag) {
+    acc_roll_angle = asin((float)accel_y / accel_vec_mag) * -(180 / PI);
   }
 }
 

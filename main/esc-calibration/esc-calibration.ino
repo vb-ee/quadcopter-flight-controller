@@ -252,15 +252,15 @@ void loop(){
       angle_roll += gyro_roll * 0.0000611;                                             //Calculate the traveled roll angle and add this to the angle_roll variable.
 
       //0.000001066 = 0.0000611 * (3.142(PI) / 180degr) The Arduino sin function is in radians
-      angle_pitch -= angle_roll * sin(gyro_yaw * 0.000001066);                         //If the IMU has yawed transfer the roll angle to the pitch angel.
-      angle_roll += angle_pitch * sin(gyro_yaw * 0.000001066);                         //If the IMU has yawed transfer the pitch angle to the roll angel.
+      angle_roll -= angle_pitch * sin(gyro_yaw * 0.000001066);                         //If the IMU has yawed transfer the roll angle to the pitch angel.
+      angle_pitch += angle_roll * sin(gyro_yaw * 0.000001066);                         //If the IMU has yawed transfer the pitch angle to the roll angel.
 
       //Accelerometer angle calculations
       acc_total_vector[0] = sqrt((acc_x*acc_x)+(acc_y*acc_y)+(acc_z*acc_z));           //Calculate the total accelerometer vector.
 
       //57.296 = 1 / (3.142 / 180) The Arduino asin function is in radians
-      angle_pitch_acc = asin((float)acc_y/acc_total_vector[0])* 57.296;                //Calculate the pitch angle.
-      angle_roll_acc = asin((float)acc_x/acc_total_vector[0])* -57.296;                //Calculate the roll angle.
+      angle_pitch_acc = asin((float)acc_x/acc_total_vector[0])* 57.296;                //Calculate the pitch angle.
+      angle_roll_acc = asin((float)acc_y/acc_total_vector[0])* -57.296;                //Calculate the roll angle.
       
       if(!first_angle){
         angle_pitch = angle_pitch_acc;                                                 //Set the pitch angle to the accelerometer angle.
@@ -476,8 +476,8 @@ void read_gyro_data(){
     acc_axis[2] = Wire.read()<<8|Wire.read();                    //Add the low and high byte to the acc_y variable.
     acc_axis[3] = Wire.read()<<8|Wire.read();                    //Add the low and high byte to the acc_z variable.
     temperature = Wire.read()<<8|Wire.read();                    //Add the low and high byte to the temperature variable.
-    gyro_axis[1] = Wire.read()<<8|Wire.read();                   //Read high and low part of the angular data.
     gyro_axis[2] = Wire.read()<<8|Wire.read();                   //Read high and low part of the angular data.
+    gyro_axis[1] = Wire.read()<<8|Wire.read();                   //Read high and low part of the angular data.
     gyro_axis[3] = Wire.read()<<8|Wire.read();                   //Read high and low part of the angular data.
   }
 

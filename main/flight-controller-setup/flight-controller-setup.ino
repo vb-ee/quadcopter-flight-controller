@@ -248,22 +248,22 @@ void loop(){
     for (cal_int = 0; cal_int < 2000 ; cal_int ++){              //Take 2000 readings for calibration.
       if(cal_int % 100 == 0)Serial.print(F("."));                //Print dot to indicate calibration.
       read_gyro_data();                                           //Read the gyro output.
-      gyro_roll_cal += gyro_roll;                                //Ad roll value to gyro_roll_cal.
-      gyro_pitch_cal += gyro_pitch;                              //Ad pitch value to gyro_pitch_cal.
+      gyro_roll_cal += gyro_roll;                              //Ad pitch value to gyro_pitch_cal.
+      gyro_pitch_cal += gyro_pitch;                                //Ad roll value to gyro_roll_cal.
       gyro_yaw_cal += gyro_yaw;                                  //Ad yaw value to gyro_yaw_cal.
       delay(3);                                                  //Wait 3 milliseconds before the next loop.
     }
     //Now that we have 2000 measures, we need to devide by 2000 to get the average gyro offset.
-    gyro_roll_cal /= 2000;                                       //Divide the roll total by 2000.
-    gyro_pitch_cal /= 2000;                                      //Divide the pitch total by 2000.
+    gyro_roll_cal /= 2000;                                      //Divide the pitch total by 2000.
+    gyro_pitch_cal /= 2000;                                       //Divide the roll total by 2000.
     gyro_yaw_cal /= 2000;                                        //Divide the yaw total by 2000.
     
     //Show the calibration results
     Serial.println(F(""));
     Serial.print(F("Axis 1 offset="));
-    Serial.println(gyro_roll_cal);
-    Serial.print(F("Axis 2 offset="));
     Serial.println(gyro_pitch_cal);
+    Serial.print(F("Axis 2 offset="));
+    Serial.println(gyro_roll_cal);
     Serial.print(F("Axis 3 offset="));
     Serial.println(gyro_yaw_cal);
     Serial.println(F(""));
@@ -497,10 +497,10 @@ void read_gyro_data(){
     Wire.endTransmission();                                      //End the transmission
     Wire.requestFrom(address,6);                                 //Request 6 bytes from the gyro
     while(Wire.available() < 6);                                 //Wait until the 6 bytes are received
-    gyro_roll=Wire.read()<<8|Wire.read();                        //Read high and low part of the angular data
-    if(cal_int == 2000)gyro_roll -= gyro_roll_cal;               //Only compensate after the calibration
-    gyro_pitch=Wire.read()<<8|Wire.read();                       //Read high and low part of the angular data
-    if(cal_int == 2000)gyro_pitch -= gyro_pitch_cal;             //Only compensate after the calibration
+    gyro_pitch=Wire.read()<<8|Wire.read();                        //Read high and low part of the angular data
+    if(cal_int == 2000)gyro_pitch -= gyro_pitch_cal;               //Only compensate after the calibration
+    gyro_roll=Wire.read()<<8|Wire.read();                       //Read high and low part of the angular data
+    if(cal_int == 2000)gyro_roll -= gyro_roll_cal;             //Only compensate after the calibration
     gyro_yaw=Wire.read()<<8|Wire.read();                         //Read high and low part of the angular data
     if(cal_int == 2000)gyro_yaw -= gyro_yaw_cal;                 //Only compensate after the calibration
   }
