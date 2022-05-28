@@ -233,10 +233,10 @@ void calculate_accel_angles() {
   accel_vec_mag = sqrt((accel_x * accel_x) + (accel_y * accel_y) + (accel_z * accel_z));
 
   if (abs(accel_x) < accel_vec_mag) {
-    acc_pitch_angle = asin((float)accel_x / accel_vec_mag) * (180 / PI);
+    acc_pitch_angle = asin((float)accel_y / accel_vec_mag) * (180 / PI);
   }
   if (abs(accel_y) < accel_vec_mag) {
-    acc_roll_angle = asin((float)accel_y / accel_vec_mag) * -(180 / PI);
+    acc_roll_angle = asin((float)accel_x / accel_vec_mag) * -(180 / PI);
   }
 }
 
