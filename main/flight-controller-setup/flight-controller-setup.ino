@@ -681,7 +681,7 @@ void check_gyro_axes(byte movement){
   
 }
 
-//This routine is called every time input 8, 9, 10 or 11 changed state
+//This routine is called every time input 10, 11, 12 or 13 changed state
 ISR(PCINT0_vect) {
   current_time = micros();
   //Channel 1=========================================
