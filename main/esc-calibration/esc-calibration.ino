@@ -259,8 +259,8 @@ void loop(){
       acc_total_vector[0] = sqrt((acc_x*acc_x)+(acc_y*acc_y)+(acc_z*acc_z));           //Calculate the total accelerometer vector.
 
       //57.296 = 1 / (3.142 / 180) The Arduino asin function is in radians
-      angle_pitch_acc = asin((float)acc_x/acc_total_vector[0])* 57.296;                //Calculate the pitch angle.
-      angle_roll_acc = asin((float)acc_y/acc_total_vector[0])* -57.296;                //Calculate the roll angle.
+      angle_pitch_acc = asin((float)acc_y/acc_total_vector[0])* 57.296;                //Calculate the pitch angle.
+      angle_roll_acc = asin((float)acc_x/acc_total_vector[0])* -57.296;                //Calculate the roll angle.
       
       if(!first_angle){
         angle_pitch = angle_pitch_acc;                                                 //Set the pitch angle to the accelerometer angle.
@@ -493,10 +493,10 @@ void read_gyro_data(){
   gyro_yaw = gyro_axis[eeprom_data[30] & 0b00000011];            //Set gyro_yaw to the correct axis that was stored in the EEPROM.
   if(eeprom_data[30] & 0b10000000)gyro_yaw *= -1;                //Invert gyro_yaw if the MSB of EEPROM bit 30 is set.
 
-  acc_x = acc_axis[eeprom_data[29] & 0b00000011];                //Set acc_x to the correct axis that was stored in the EEPROM.
-  if(eeprom_data[29] & 0b10000000)acc_x *= -1;                   //Invert acc_x if the MSB of EEPROM bit 29 is set.
-  acc_y = acc_axis[eeprom_data[28] & 0b00000011];                //Set acc_y to the correct axis that was stored in the EEPROM.
-  if(eeprom_data[28] & 0b10000000)acc_y *= -1;                   //Invert acc_y if the MSB of EEPROM bit 28 is set.
+  acc_x = acc_axis[eeprom_data[28] & 0b00000011];                //Set acc_x to the correct axis that was stored in the EEPROM.
+  if(eeprom_data[29] & 0b10000000)acc_x *= -1;                   //Invert acc_x if the MSB of EEPROM bit 28 is set.
+  acc_y = acc_axis[eeprom_data[29] & 0b00000011];                //Set acc_y to the correct axis that was stored in the EEPROM.
+  if(eeprom_data[28] & 0b10000000)acc_y *= -1;                   //Invert acc_y if the MSB of EEPROM bit 29 is set.
   acc_z = acc_axis[eeprom_data[30] & 0b00000011];                //Set acc_z to the correct axis that was stored in the EEPROM.
   if(eeprom_data[30] & 0b10000000)acc_z *= -1;                   //Invert acc_z if the MSB of EEPROM bit 30 is set.
 }

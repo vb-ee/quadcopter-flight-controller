@@ -29,16 +29,16 @@ struct QuadData {
 QuadData quad_data;
 
 void reset_data() {
-  quad_data.throttle = 127;
+  quad_data.throttle = 0;
   quad_data.pitch = 127;
   quad_data.roll = 127;
   quad_data.yaw = 127;
 }
 
 void set_ppm_values() {
-  ch1_pulse = map(quad_data.throttle, 0, 255, 1000, 2000);
+  ch3_pulse = map(quad_data.throttle, 0, 255, 1000, 2000);
   ch2_pulse = map(quad_data.pitch,    0, 255, 1000, 2000);
-  ch3_pulse = map(quad_data.roll,     0, 255, 1000, 2000);
+  ch1_pulse = map(quad_data.roll,     0, 255, 1000, 2000);
   ch4_pulse = map(quad_data.yaw,      0, 255, 1000, 2000);
 }
 
