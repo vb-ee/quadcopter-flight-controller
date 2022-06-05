@@ -27,8 +27,10 @@ void setup() {
   Serial.begin(57600);
   TWBR = 12;
   Wire.begin();
+  digitalWrite(46, HIGH);
   set_mpu();
   calc_gyro_offsets();
+  digitalWrite(46, LOW);
   loop_timer = micros();
 }
 
@@ -55,25 +57,25 @@ void loop() {
   accel_vec_mag = sqrt((accel_x * accel_x) + (accel_y * accel_y) + (accel_z * accel_z));
   acc_pitch_angle = asin(accel_y / accel_vec_mag) * 57.296;
   acc_roll_angle = asin(accel_x / accel_vec_mag) * -57.296;
-//
-//  if (set_gyro_angle) {
-//// using complementary filter to reduce the noise
-//    pitch_angle = pitch_angle * 0.9996 + acc_pitch_angle * 0.0004;
-//    roll_angle = roll_angle * 0.9996 + acc_roll_angle * 0.0004;
-//  }
-//  else {
-//// setting initial angle values
-//    pitch_angle = acc_pitch_angle;
-//    roll_angle = acc_roll_angle;
-//    set_gyro_angle = true;
-//  }
+
+  if (set_gyro_angle) {
+// using complementary filter to reduce the noise
+    pitch_angle = pitch_angle * 0.9996 + acc_pitch_angle * 0.0004;
+    roll_angle = roll_angle * 0.9996 + acc_roll_angle * 0.0004;
+  }
+  else {
+// setting initial angle values
+    pitch_angle = acc_pitch_angle;
+    roll_angle = acc_roll_angle;
+    set_gyro_angle = true;
+  }
 
 // getting more steady angle values  
 //  pitch_out = 0.9 * pitch_out + 0.1 * pitch_angle;
 //  roll_out = 0.9 * roll_out + 0.1 * roll_angle;
 
-  print_angles();
-    print_raw();
+//  print_angles();
+  print_raw();
 
 // looptime is set to 4000 but can be changed according to the implementation
   while (micros() - loop_timer < 4000);
@@ -144,7 +146,7 @@ void print_angles() {
   Serial.print("Pitch angle = ");
   Serial.print(pitch_angle);
   Serial.print(" Roll angle = ");
-  Serial.print(roll_angle);
+  Serial.println(roll_angle);
 }
 
 void print_raw() {
@@ -156,5 +158,4 @@ void print_raw() {
   Serial.print(acc_pitch_angle);
   Serial.print(" accel_y = ");
   Serial.println(acc_roll_angle);
-
 }

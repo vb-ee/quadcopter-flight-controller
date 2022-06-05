@@ -29,7 +29,7 @@ struct QuadData {
 QuadData quad_data;
 
 void reset_data() {
-  quad_data.throttle = 0;
+  quad_data.throttle = 127;
   quad_data.pitch = 127;
   quad_data.roll = 127;
   quad_data.yaw = 127;
@@ -44,7 +44,7 @@ void set_ppm_values() {
 
 void setup() {
   Serial.begin(57600);
-  
+
   radio.begin();
   radio.setAutoAck(false);
   radio.setPALevel(RF24_PA_LOW);
@@ -77,7 +77,7 @@ void loop() {
   channel_3.writeMicroseconds(ch3_pulse);  
   channel_4.writeMicroseconds(ch4_pulse);  
   
-//  print_data();
+  print_data();
 }
 
 void receive_data()
@@ -90,11 +90,11 @@ void receive_data()
 
 void print_data() {
   Serial.print("Throttle: ");
-  Serial.print(ch1_pulse);
+  Serial.print(ch3_pulse);
   Serial.print(" Pitch: ");
   Serial.print(ch2_pulse);
   Serial.print(" Roll: ");
-  Serial.print(ch3_pulse);
+  Serial.print(ch1_pulse);
   Serial.print(" Yaw: ");
   Serial.println(ch4_pulse);
 }

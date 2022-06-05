@@ -16,7 +16,7 @@ struct QuadData {
 QuadData quad_data;
 
 void reset_data() {
-  quad_data.throttle = 0;
+  quad_data.throttle = 127;
   quad_data.pitch = 127;
   quad_data.roll = 127;
   quad_data.yaw = 127;
@@ -34,7 +34,7 @@ int map_joystick_values(int val, int lower, int middle, int upper, bool reverse)
 
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(57600);
   radio.begin();
   radio.setAutoAck(false);
   radio.setPALevel(RF24_PA_LOW);
@@ -52,6 +52,8 @@ void loop()
   quad_data.yaw      = map_joystick_values( analogRead(A1), 16, 510, 1004, true );
   quad_data.pitch    = map_joystick_values( analogRead(A2), 16, 526, 1006, true );
   quad_data.roll     = map_joystick_values( analogRead(A3), 16, 517, 988, true );
+
+  printJoystickValues();
 
   radio.write(&quad_data, sizeof(QuadData));
 }
