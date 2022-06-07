@@ -223,19 +223,19 @@ void calculate_gyro_angles() {
 
 
 void calculate_accel_angles() {
-  accel_x = accel_axis[eeprom_data[29] & 0b00000011];                           //Set acc_x to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[29] & 0b10000000)accel_x *= -1;                             //Invert acc_x if the MSB of EEPROM bit 29 is set.
-  accel_y = accel_axis[eeprom_data[28] & 0b00000011];                           //Set acc_y to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[28] & 0b10000000)accel_y *= -1;                             //Invert acc_y if the MSB of EEPROM bit 28 is set.
+  accel_x = accel_axis[eeprom_data[28] & 0b00000011];                           //Set acc_x to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[28] & 0b10000000)accel_x *= -1;                             //Invert acc_x if the MSB of EEPROM bit 29 is set.
+  accel_y = accel_axis[eeprom_data[29] & 0b00000011];                           //Set acc_y to the correct axis that was stored in the EEPROM.
+  if (eeprom_data[29] & 0b10000000)accel_y *= -1;                             //Invert acc_y if the MSB of EEPROM bit 28 is set.
   accel_z = accel_axis[eeprom_data[30] & 0b00000011];                           //Set acc_z to the correct axis that was stored in the EEPROM.
   if (eeprom_data[30] & 0b10000000)accel_z *= -1;                             //Invert acc_z if the MSB of EEPROM bit 30 is set.
   
   accel_vec_mag = sqrt((accel_x * accel_x) + (accel_y * accel_y) + (accel_z * accel_z));
 
-  if (abs(accel_x) < accel_vec_mag) {
+  if (abs(accel_y) < accel_vec_mag) {
     acc_pitch_angle = asin((float)accel_y / accel_vec_mag) * (180 / PI);
   }
-  if (abs(accel_y) < accel_vec_mag) {
+  if (abs(accel_x) < accel_vec_mag) {
     acc_roll_angle = asin((float)accel_x / accel_vec_mag) * -(180 / PI);
   }
 }
