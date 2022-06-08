@@ -74,8 +74,7 @@ void loop() {
 //  pitch_out = 0.9 * pitch_out + 0.1 * pitch_angle;
 //  roll_out = 0.9 * roll_out + 0.1 * roll_angle;
 
-//  print_angles();
-  print_raw();
+  print_angles();
 
 // looptime is set to 4000 but can be changed according to the implementation
   while (micros() - loop_timer < 4000);
@@ -147,15 +146,8 @@ void print_angles() {
   Serial.print(pitch_angle);
   Serial.print(" Roll angle = ");
   Serial.println(roll_angle);
-}
-
-void print_raw() {
-//  Serial.print("gyro_x = ");
-//  Serial.print(gyro_x);
-//  Serial.print(" gyro_y = ");
-//  Serial.print(gyro_y);
-  Serial.print(" accel_x = ");
-  Serial.print(acc_pitch_angle);
-  Serial.print(" accel_y = ");
-  Serial.println(acc_roll_angle);
+//  Serial.print("  accel_pitch = ");
+//  Serial.print(acc_pitch_angle);
+//  Serial.print("  accel_roll = ");
+//  Serial.println(acc_roll_angle);
 }

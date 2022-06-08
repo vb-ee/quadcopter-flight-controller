@@ -494,9 +494,9 @@ void read_gyro_data(){
   if(eeprom_data[30] & 0b10000000)gyro_yaw *= -1;                //Invert gyro_yaw if the MSB of EEPROM bit 30 is set.
 
   acc_x = acc_axis[eeprom_data[28] & 0b00000011];                //Set acc_x to the correct axis that was stored in the EEPROM.
-  if(eeprom_data[29] & 0b10000000)acc_x *= -1;                   //Invert acc_x if the MSB of EEPROM bit 28 is set.
+  if(eeprom_data[28] & 0b10000000)acc_x *= -1;                   //Invert acc_x if the MSB of EEPROM bit 28 is set.
   acc_y = acc_axis[eeprom_data[29] & 0b00000011];                //Set acc_y to the correct axis that was stored in the EEPROM.
-  if(eeprom_data[28] & 0b10000000)acc_y *= -1;                   //Invert acc_y if the MSB of EEPROM bit 29 is set.
+  if(eeprom_data[29] & 0b10000000)acc_y *= -1;                   //Invert acc_y if the MSB of EEPROM bit 29 is set.
   acc_z = acc_axis[eeprom_data[30] & 0b00000011];                //Set acc_z to the correct axis that was stored in the EEPROM.
   if(eeprom_data[30] & 0b10000000)acc_z *= -1;                   //Invert acc_z if the MSB of EEPROM bit 30 is set.
 }
