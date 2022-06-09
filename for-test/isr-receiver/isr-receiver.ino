@@ -14,10 +14,11 @@ void setup() {
 }
 
 void loop() {
-  PORTA |= B11110000;
-  delayMicroseconds(1000);
-  PORTA &= B00001111;
-  delayMicroseconds(3000);
+  delay(4);
+//  PORTA |= B11110000;
+//  delayMicroseconds(1000);
+//  PORTA &= B00001111;
+//  delayMicroseconds(3000);
   print_signals();
 }
 

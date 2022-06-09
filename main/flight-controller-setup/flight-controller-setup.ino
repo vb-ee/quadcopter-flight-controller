@@ -20,7 +20,7 @@ float gyro_roll_cal, gyro_pitch_cal, gyro_yaw_cal;
 
 
 void setup(){
-  pinMode(2, OUTPUT);
+  pinMode(49, OUTPUT);
   
   //Arduino (Atmega) pins default to inputs, so they don't need to be explicitly declared as inputs
   PCICR  |= (1 << PCIE0);  // Set PCIE0 to enable PCMSK0 scan
@@ -326,11 +326,11 @@ void loop(){
     Serial.println(F("==================================================="));
     Serial.println(F("LED test"));
     Serial.println(F("==================================================="));
-    digitalWrite(12, HIGH);
+    digitalWrite(49, HIGH);
     Serial.println(F("The LED should now be lit"));
     Serial.println(F("Move stick 'nose up' and back to center to continue"));
     check_to_continue();
-    digitalWrite(12, LOW);
+    digitalWrite(49, LOW);
   }
   
   Serial.println(F(""));
@@ -398,20 +398,20 @@ void loop(){
     //To make sure evrything is ok, verify the EEPROM data.
     Serial.println(F("Verify EEPROM data"));
     delay(1000);
-    if(center_channel_1 != EEPROM.get(0, center_channel_1))error = 1;
-    if(center_channel_2 != EEPROM.get(2, center_channel_2))error = 1;
-    if(center_channel_3 != EEPROM.get(4, center_channel_3))error = 1;
-    if(center_channel_4 != EEPROM.get(6, center_channel_4))error = 1;
+    if(center_channel_1 != ((EEPROM.read(1) << 8) | EEPROM.read(0)))error = 1;
+    if(center_channel_2 != ((EEPROM.read(3) << 8) | EEPROM.read(2)))error = 1;
+    if(center_channel_3 != ((EEPROM.read(5) << 8) | EEPROM.read(4)))error = 1;
+    if(center_channel_4 != ((EEPROM.read(7) << 8) | EEPROM.read(6)))error = 1;
     
-    if(high_channel_1 != EEPROM.get(8, high_channel_1))error = 1;
-    if(high_channel_2 != EEPROM.get(10, high_channel_2))error = 1;
-    if(high_channel_3 != EEPROM.get(12, high_channel_3))error = 1;
-    if(high_channel_4 != EEPROM.get(14, high_channel_4))error = 1;
+    if(high_channel_1 != ((EEPROM.read(9) << 8) | EEPROM.read(8)))error = 1;
+    if(high_channel_2 != ((EEPROM.read(11) << 8) | EEPROM.read(10)))error = 1;
+    if(high_channel_3 != ((EEPROM.read(13) << 8) | EEPROM.read(12)))error = 1;
+    if(high_channel_4 != ((EEPROM.read(15) << 8) | EEPROM.read(14)))error = 1;
     
-    if(low_channel_1 != EEPROM.get(16, low_channel_1))error = 1;
-    if(low_channel_2 != EEPROM.get(18, low_channel_2))error = 1;
-    if(low_channel_3 != EEPROM.get(20, low_channel_3))error = 1;
-    if(low_channel_4 != EEPROM.get(22, low_channel_4))error = 1;
+    if(low_channel_1 != ((EEPROM.read(17) << 8) | EEPROM.read(16)))error = 1;
+    if(low_channel_2 != ((EEPROM.read(19) << 8) | EEPROM.read(18)))error = 1;
+    if(low_channel_3 != ((EEPROM.read(21) << 8) | EEPROM.read(20)))error = 1;
+    if(low_channel_4 != ((EEPROM.read(23) << 8) | EEPROM.read(22)))error = 1;
     
     if(channel_1_assign != EEPROM.read(24))error = 1;
     if(channel_2_assign != EEPROM.read(25))error = 1;
@@ -424,9 +424,9 @@ void loop(){
     if(type != EEPROM.read(31))error = 1;
     if(gyro_address != EEPROM.read(32))error = 1;
     
-    if('J' != EEPROM.read(33))error = 1;
-    if('M' != EEPROM.read(34))error = 1;
-    if('B' != EEPROM.read(35))error = 1;
+    if('V' != EEPROM.read(33))error = 1;
+    if('B' != EEPROM.read(34))error = 1;
+    if('M' != EEPROM.read(35))error = 1;
   
     if(error == 1)Serial.println(F("EEPROM verification failed!!! (ERROR 5)"));
     else Serial.println(F("Verification done"));

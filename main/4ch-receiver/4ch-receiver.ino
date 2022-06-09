@@ -75,7 +75,7 @@ void loop() {
   channel_1.writeMicroseconds(ch1_pulse);  
   channel_2.writeMicroseconds(ch2_pulse);  
   channel_3.writeMicroseconds(ch3_pulse);  
-  channel_4.writeMicroseconds(ch4_pulse);  
+  channel_4.writeMicroseconds(ch4_pulse);
  }
 
 void receive_data()
