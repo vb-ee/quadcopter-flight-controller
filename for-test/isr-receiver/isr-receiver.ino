@@ -5,6 +5,7 @@ volatile int receiver_input[4];
 
 void setup() {
   Serial.begin(57600);
+  DDRA |= B11110000; // Set 26, 27, 28 and 29 pins as outputs
   PCICR  |= (1 << PCIE0);  // Set PCIE0 to enable PCMSK0 scan
   PCMSK0 |= (1 << PCINT4); // Set PCINT0 (digital input 10) to trigger an interrupt on state change
   PCMSK0 |= (1 << PCINT5); // Set PCINT1 (digital input 11) to trigger an interrupt on state change
@@ -13,7 +14,10 @@ void setup() {
 }
 
 void loop() {
-  delay(1000);
+  PORTA |= B11110000;
+  delayMicroseconds(1000);
+  PORTA &= B00001111;
+  delayMicroseconds(3000);
   print_signals();
 }
 
