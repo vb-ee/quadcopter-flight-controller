@@ -367,18 +367,30 @@ void loop(){
     delay(1000);
     Serial.println(F("Done!"));
     // 16 bit variables
-    EEPROM.put(0, center_channel_1);
-    EEPROM.put(2, center_channel_2);
-    EEPROM.put(4, center_channel_3);
-    EEPROM.put(6, center_channel_4);
-    EEPROM.put(8, high_channel_1);
-    EEPROM.put(10, high_channel_2);
-    EEPROM.put(12, high_channel_3);
-    EEPROM.put(14, high_channel_4);
-    EEPROM.put(16, low_channel_1);
-    EEPROM.put(18, low_channel_2);
-    EEPROM.put(20, low_channel_3);
-    EEPROM.put(22, low_channel_4);
+    EEPROM.write(0, center_channel_1 & 0b11111111);
+    EEPROM.write(1, center_channel_1 >> 8);
+    EEPROM.write(2, center_channel_2 & 0b11111111);
+    EEPROM.write(3, center_channel_2 >> 8);
+    EEPROM.write(4, center_channel_3 & 0b11111111);
+    EEPROM.write(5, center_channel_3 >> 8);
+    EEPROM.write(6, center_channel_4 & 0b11111111);
+    EEPROM.write(7, center_channel_4 >> 8);
+    EEPROM.write(8, high_channel_1 & 0b11111111);
+    EEPROM.write(9, high_channel_1 >> 8);
+    EEPROM.write(10, high_channel_2 & 0b11111111);
+    EEPROM.write(11, high_channel_2 >> 8);
+    EEPROM.write(12, high_channel_3 & 0b11111111);
+    EEPROM.write(13, high_channel_3 >> 8);
+    EEPROM.write(14, high_channel_4 & 0b11111111);
+    EEPROM.write(15, high_channel_4 >> 8);
+    EEPROM.write(16, low_channel_1 & 0b11111111);
+    EEPROM.write(17, low_channel_1 >> 8);
+    EEPROM.write(18, low_channel_2 & 0b11111111);
+    EEPROM.write(19, low_channel_2 >> 8);
+    EEPROM.write(20, low_channel_3 & 0b11111111);
+    EEPROM.write(21, low_channel_3 >> 8);
+    EEPROM.write(22, low_channel_4 & 0b11111111);
+    EEPROM.write(23, low_channel_4 >> 8);
     // 8 bit variables
     EEPROM.write(24, channel_1_assign);
     EEPROM.write(25, channel_2_assign);
@@ -621,14 +633,14 @@ void register_min_max(){
     if(receiver_input_channel_2 < center_channel_2 + 20 && receiver_input_channel_2 > center_channel_2 - 20)zero |= 0b00000010;
     if(receiver_input_channel_3 < center_channel_3 + 20 && receiver_input_channel_3 > center_channel_3 - 20)zero |= 0b00000100;
     if(receiver_input_channel_4 < center_channel_4 + 20 && receiver_input_channel_4 > center_channel_4 - 20)zero |= 0b00001000;
-    if(receiver_input_channel_1 < low_channel_1)low_channel_1 = receiver_input_channel_1;
-    if(receiver_input_channel_2 < low_channel_2)low_channel_2 = receiver_input_channel_2;
-    if(receiver_input_channel_3 < low_channel_3)low_channel_3 = receiver_input_channel_3;
-    if(receiver_input_channel_4 < low_channel_4)low_channel_4 = receiver_input_channel_4;
-    if(receiver_input_channel_1 > high_channel_1)high_channel_1 = receiver_input_channel_1;
-    if(receiver_input_channel_2 > high_channel_2)high_channel_2 = receiver_input_channel_2;
-    if(receiver_input_channel_3 > high_channel_3)high_channel_3 = receiver_input_channel_3;
-    if(receiver_input_channel_4 > high_channel_4)high_channel_4 = receiver_input_channel_4;
+    if(receiver_input_channel_1 < low_channel_1 && receiver_input_channel_1 < 1020)low_channel_1 = receiver_input_channel_1;
+    if(receiver_input_channel_2 < low_channel_2 && receiver_input_channel_2 < 1020)low_channel_2 = receiver_input_channel_2;
+    if(receiver_input_channel_3 < low_channel_3 && receiver_input_channel_3 < 1020)low_channel_3 = receiver_input_channel_3;
+    if(receiver_input_channel_4 < low_channel_4 && receiver_input_channel_4 < 1020)low_channel_4 = receiver_input_channel_4;
+    if(receiver_input_channel_1 > high_channel_1 && receiver_input_channel_1 > 1990)high_channel_1 = receiver_input_channel_1;
+    if(receiver_input_channel_2 > high_channel_2 && receiver_input_channel_2 > 1990)high_channel_2 = receiver_input_channel_2;
+    if(receiver_input_channel_3 > high_channel_3 && receiver_input_channel_3 > 1990)high_channel_3 = receiver_input_channel_3;
+    if(receiver_input_channel_4 > high_channel_4 && receiver_input_channel_4 > 1990)high_channel_4 = receiver_input_channel_4;
     delay(100);
   }
 }

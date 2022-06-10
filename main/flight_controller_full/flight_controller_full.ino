@@ -1,9 +1,9 @@
 #include <Wire.h>
 #include <EEPROM.h>
 
-#define throt 1
+#define throt 3
 #define pitch 2
-#define roll 3
+#define roll 1
 #define yaw 4
 
 #define stopped 0
@@ -40,7 +40,7 @@ float kd_roll = 18.0;
 float kp_pitch = kp_roll;
 float ki_pitch = ki_roll;
 float kd_pitch = kd_roll;
-float kp_yaw = 4.0;
+float kp_yaw = 3.0;
 float ki_yaw = 0.02;
 float kd_yaw = 0.0;
 
@@ -58,6 +58,7 @@ void setup() {
   Serial.begin(57600);
 
   for (counter = 0; counter <= 35; counter++)eeprom_data[counter] = EEPROM.read(counter);
+
   counter = 0;
 
   gyro_address = eeprom_data[32];
@@ -68,8 +69,8 @@ void setup() {
   DDRA |= B11110000; // Set 26, 27, 28 and 29 pins as outputs
   DDRE |= B00001000; //Configure digital poort 2 as output.
   
-  digitalWrite(2, HIGH);
-
+  digitalWrite(49, HIGH);
+  
   //Check the EEPROM signature to make sure that the setup program is executed.
   while (eeprom_data[33] != 'V' || eeprom_data[34] != 'B' || eeprom_data[35] != 'M')delay(10);
 
@@ -81,8 +82,9 @@ void setup() {
     PORTA &= B00001111;             //Set digital ports 26, 27, 28 and 29 low.
     delayMicroseconds(3000);                                                
   }
-  
+  Serial.println("Calibration Start");
   calibrate_gyro();
+  Serial.println("Calibration Finish");
 
   PCICR  |= (1 << PCIE0);  // Set PCIE0 to enable PCMSK0 scan
   PCMSK0 |= (1 << PCINT4); // Set PCINT4 (digital input 10) to trigger an interrupt on state change
@@ -100,7 +102,7 @@ void setup() {
     PORTA &= B00001111;                                                     //Set digital poort 26, 27, 28 and 29 low.
     delay(3);                                                               //Wait 3 milliseconds before the next loop.
     if (counter == 125) {                                                   //Every 125 loops (500ms).
-      digitalWrite(2, !digitalRead(2));                                     //Change the led status.
+      digitalWrite(49, !digitalRead(49));                                     //Change the led status.
       counter = 0;                                                          //Start again at 0.
     }
   }
@@ -110,8 +112,8 @@ void setup() {
   battery_voltage = (analogRead(0) + 65) * 1.2317;
 
   loop_timer = micros();
-  
-  digitalWrite(2, LOW);
+  Serial.println("Setup finished");
+  digitalWrite(49, LOW);
 }
 
 
@@ -126,8 +128,10 @@ void loop() {
   
   if (is_started()) pid_control();
 
+  print_angles();
 
   run_motors();
+
 }
 
 void set_mpu6050() {
@@ -147,12 +151,12 @@ void set_mpu6050() {
   Wire.endTransmission();
 
   //Random register check to see if the values are written correct
-  Wire.requestFrom(0x68, 1);                                         
-  while (Wire.available() < 1);                                      
-  if (Wire.read() != 0x08) {                                         
-    digitalWrite(12, HIGH);                                          
-    while (1) delay(10);                                              
-  }
+//  Wire.requestFrom(0x68, 1);                                         
+//  while (Wire.available() < 1);                                      
+//  if (Wire.read() != 0x08) {                                         
+//    digitalWrite(49, HIGH);                                          
+//    while (1) delay(10);                                              
+//  }
 
   Wire.beginTransmission(0x68);
   Wire.write(0x1A);
@@ -182,7 +186,7 @@ void read_mpu6050() {
 
 void calibrate_gyro() {
   for (int i = 0; i < 2000; i++) {
-    if (i % 15 == 0) digitalWrite(2, !digitalRead(2));  // Change the led status to indicate calibration.
+    if (i % 15 == 0) digitalWrite(49, !digitalRead(49));  // Change the led status to indicate calibration.
     read_mpu6050();
     gyro_avg[1] += gyro_axis[1];
     gyro_avg[2] += gyro_axis[2];
@@ -423,7 +427,7 @@ bool battery_connected() {
 }
 
 void compensate_battery() {
-  if (battery_voltage < 1000 && battery_voltage > 600)digitalWrite(2, HIGH);
+  if (battery_voltage < 1000 && battery_voltage > 600)digitalWrite(49, HIGH);
   if (battery_connected()) {
     esc1 += esc1 * ((1240 - battery_voltage) / (float) 3500);
     esc2 += esc2 * ((1240 - battery_voltage) / (float) 3500);
@@ -517,27 +521,19 @@ ISR(PCINT0_vect) {
   }
 }
 
-void print_info() {
-  Serial.print("Loop time: ");
-  Serial.println(micros() - loop_timer);
-  //    Serial.print(" Pitch: ");
-  //    Serial.print(measured_pitch);
-  //    Serial.print(" Roll: ");
-  //    Serial.print(measured_roll);
-  //    Serial.print(" esc1: ");
-  //    Serial.print(esc1);
-  //    Serial.print(" esc2: ");
-  //    Serial.print(esc2);
-  //    Serial.print(" esc3: ");
-  //    Serial.print(esc3);
-  //    Serial.print(" esc4: ");
-  //    Serial.println(esc4);
+void print_escs() {
+  Serial.print("esc1: ");
+  Serial.print(esc1);
+  Serial.print(" esc2: ");
+  Serial.print(esc2);
+  Serial.print(" esc3: ");
+  Serial.print(esc3);
+  Serial.print(" esc4: ");
+  Serial.println(esc4);
 }
 
-void print_data() {
-  Serial.print("Loop time: ");
-  Serial.print(micros() - loop_timer);
-  Serial.print(" Throttle: ");
+void print_pulses() {
+  Serial.print("Throttle: ");
   Serial.print(pulse_length[throt]);
   Serial.print(" Pitch: ");
   Serial.print(pulse_length[pitch]);
@@ -546,3 +542,21 @@ void print_data() {
   Serial.print(" Yaw: ");
   Serial.println(pulse_length[yaw]);
 }
+
+void print_angles() {
+  Serial.print("Pitch Angle: ");
+  Serial.print(pitch_angle);
+  Serial.print(" Roll Angle: ");
+  Serial.println(roll_angle);
+ }
+
+ void print_gyro_raw() {
+  Serial.print("Gyro Pitch: ");
+  Serial.print(gyro_pitch);
+  Serial.print(" Gyro Roll: ");
+  Serial.print(gyro_roll);
+  Serial.print(" Accel Y: ");
+  Serial.print(acc_pitch_angle);
+  Serial.print(" Accel X: ");
+  Serial.println(acc_roll_angle);
+ }
