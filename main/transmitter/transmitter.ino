@@ -48,10 +48,10 @@ void setup()
 
 void loop()
 {
-  quad_data.throttle = map_joystick_values( analogRead(A0), 0, 523, 1024, false );
-  quad_data.yaw      = map_joystick_values( analogRead(A1), 0, 495, 1024, false );
-  quad_data.pitch    = map_joystick_values( analogRead(A2), 0, 522, 1024, false );
-  quad_data.roll     = map_joystick_values( analogRead(A3), 0, 507, 1024, false );
+  quad_data.throttle = map_joystick_values( analogRead(A0), 0, 501, 1024, false );
+  quad_data.yaw      = map_joystick_values( analogRead(A1), 0, 506, 1024, false );
+  quad_data.pitch    = map_joystick_values( analogRead(A2), 0, 517, 1024, false );
+  quad_data.roll     = map_joystick_values( analogRead(A3), 0, 510, 1024, false );
 
   radio.write(&quad_data, sizeof(QuadData));
 }

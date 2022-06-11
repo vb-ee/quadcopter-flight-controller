@@ -17,16 +17,15 @@ volatile int receiver_input[5];
 volatile int pulse_length[5];
 volatile unsigned long timer_1, timer_2, timer_3, timer_4, current_time;
 volatile byte last_channel_1, last_channel_2, last_channel_3, last_channel_4;
-
-float accel_axis[4], gyro_axis[4]; 
-double gyro_avg[4];
+ 
+double gyro_x_avg, gyro_y_avg, gyro_z_avg;
 float acc_pitch_angle, acc_roll_angle;
 float accel_x, accel_y, accel_z, accel_vec_mag;
-double gyro_pitch, gyro_roll, gyro_yaw;
+float gyro_x, gyro_y, gyro_z;
 float pitch_angle, roll_angle, yaw_angle;
 
 int temp;
-boolean gyro_angle_set;
+boolean gyro_angle_set = false;
 
 unsigned long int loop_timer, time_diff;
 unsigned long int esc1, esc2, esc3, esc4;
@@ -65,9 +64,9 @@ void setup() {
   
   Wire.begin();
   TWBR = 12; // Set I2C clock frequency to 400kHz
-   
+
+  pinMode(49, OUTPUT);
   DDRA |= B11110000; // Set 26, 27, 28 and 29 pins as outputs
-  DDRE |= B00001000; //Configure digital poort 2 as output.
   
   digitalWrite(49, HIGH);
   
@@ -119,7 +118,7 @@ void setup() {
 
 void loop() {   
   read_mpu6050();
-
+  
   calculate_angles();
 
   calculate_setpoints();
@@ -127,8 +126,6 @@ void loop() {
   calculate_pid();
   
   if (is_started()) pid_control();
-
-  print_angles();
 
   run_motors();
 
@@ -150,14 +147,6 @@ void set_mpu6050() {
   Wire.write(0x10);
   Wire.endTransmission();
 
-  //Random register check to see if the values are written correct
-//  Wire.requestFrom(0x68, 1);                                         
-//  while (Wire.available() < 1);                                      
-//  if (Wire.read() != 0x08) {                                         
-//    digitalWrite(49, HIGH);                                          
-//    while (1) delay(10);                                              
-//  }
-
   Wire.beginTransmission(0x68);
   Wire.write(0x1A);
   Wire.write(0x03);
@@ -174,13 +163,13 @@ void read_mpu6050() {
   convert_receiver_signals();
   
   while (Wire.available() < 14);
-  accel_axis[1] = Wire.read() << 8 | Wire.read();
-  accel_axis[2] = Wire.read() << 8 | Wire.read();
-  accel_axis[3] = Wire.read() << 8 | Wire.read();
+  accel_x = Wire.read() << 8 | Wire.read();
+  accel_y = Wire.read() << 8 | Wire.read();
+  accel_z = Wire.read() << 8 | Wire.read();
   temp = Wire.read() << 8 | Wire.read();
-  gyro_axis[2] = Wire.read() << 8 | Wire.read();
-  gyro_axis[1] = Wire.read() << 8 | Wire.read();
-  gyro_axis[3] = Wire.read() << 8 | Wire.read();
+  gyro_x = Wire.read() << 8 | Wire.read();
+  gyro_y = Wire.read() << 8 | Wire.read();
+  gyro_z = Wire.read() << 8 | Wire.read();
 }
 
 
@@ -188,9 +177,9 @@ void calibrate_gyro() {
   for (int i = 0; i < 2000; i++) {
     if (i % 15 == 0) digitalWrite(49, !digitalRead(49));  // Change the led status to indicate calibration.
     read_mpu6050();
-    gyro_avg[1] += gyro_axis[1];
-    gyro_avg[2] += gyro_axis[2];
-    gyro_avg[3] += gyro_axis[3];
+    gyro_x_avg += gyro_x;
+    gyro_y_avg += gyro_y;
+    gyro_z_avg += gyro_z;
 
     // Preventing esc beeps during calibration
     PORTA |= B11110000; // Set pins 26, 27, 28 and 29 to high 
@@ -199,41 +188,26 @@ void calibrate_gyro() {
     delay(3);
   }
 
-  gyro_avg[1] /= 2000;
-  gyro_avg[2] /= 2000;
-  gyro_avg[3] /= 2000;
+  gyro_x_avg /= 2000;
+  gyro_y_avg /= 2000;
+  gyro_z_avg /= 2000;
 }
 
 
 void calculate_gyro_angles() {
-  gyro_axis[1] -= gyro_avg[1];
-  gyro_axis[2] -= gyro_avg[2];
-  gyro_axis[3] -= gyro_avg[3];
-
-  gyro_roll = gyro_axis[eeprom_data[28] & 0b00000011];                      //Set gyro_roll to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[28] & 0b10000000)gyro_roll *= -1;                         //Invert gyro_roll if the MSB of EEPROM bit 28 is set.
-  gyro_pitch = gyro_axis[eeprom_data[29] & 0b00000011];                     //Set gyro_pitch to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[29] & 0b10000000)gyro_pitch *= -1;                        //Invert gyro_pitch if the MSB of EEPROM bit 29 is set.
-  gyro_yaw = gyro_axis[eeprom_data[30] & 0b00000011];                       //Set gyro_axis[2]aw to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[30] & 0b10000000)gyro_yaw *= -1;                          //Invert gyro_axis[2]aw if the MSB of EEPROM bit 30 is set.
-
+  gyro_x -= gyro_x_avg;
+  gyro_y -= gyro_y_avg;
+  gyro_z -= gyro_z_avg;
   
-  pitch_angle += (gyro_pitch / (refresh_rate * 65.5));
-  roll_angle += (gyro_roll / (refresh_rate * 65.5));
+  pitch_angle += (gyro_x / (refresh_rate * 65.5));
+  roll_angle += (gyro_y / (refresh_rate * 65.5));
 
-  pitch_angle += roll_angle * sin(gyro_yaw * (PI / (refresh_rate * 65.5 * 180)));
-  roll_angle -= pitch_angle * sin(gyro_yaw * (PI / (refresh_rate * 65.5 * 180)));
+  pitch_angle += roll_angle * sin(gyro_z * (PI / (refresh_rate * 65.5 * 180)));
+  roll_angle -= pitch_angle * sin(gyro_z * (PI / (refresh_rate * 65.5 * 180)));
 }
 
 
 void calculate_accel_angles() {
-  accel_x = accel_axis[eeprom_data[28] & 0b00000011];                           //Set acc_x to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[28] & 0b10000000)accel_x *= -1;                             //Invert acc_x if the MSB of EEPROM bit 29 is set.
-  accel_y = accel_axis[eeprom_data[29] & 0b00000011];                           //Set acc_y to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[29] & 0b10000000)accel_y *= -1;                             //Invert acc_y if the MSB of EEPROM bit 28 is set.
-  accel_z = accel_axis[eeprom_data[30] & 0b00000011];                           //Set acc_z to the correct axis that was stored in the EEPROM.
-  if (eeprom_data[30] & 0b10000000)accel_z *= -1;                             //Invert acc_z if the MSB of EEPROM bit 30 is set.
-  
   accel_vec_mag = sqrt((accel_x * accel_x) + (accel_y * accel_y) + (accel_z * accel_z));
 
   if (abs(accel_y) < accel_vec_mag) {
@@ -257,10 +231,11 @@ void calculate_angles() {
     reset_gyro_angles();
     gyro_angle_set = true;
   }
+  
+  pitch_input = 0.7 * pitch_input + 0.3 * gyro_x / 65.5;
+  roll_input = 0.7 * roll_input + 0.3 * gyro_y / 65.5;
+  yaw_input = 0.7 * yaw_input + 0.3 * gyro_z / 65.5;
 
-  pitch_input = 0.7 * pitch_input + 0.3 * gyro_pitch / 65.5;
-  roll_input = 0.7 * roll_input + 0.3 * gyro_roll / 65.5;
-  yaw_input = 0.7 * yaw_input + 0.3 * gyro_yaw / 65.5;
 }
 
 
@@ -319,12 +294,12 @@ void reset_pid_values() {
 
 bool is_started() {
   // When left stick is moved in the bottom left corner
-  if (status == stopped && pulse_length[yaw] < 1050 && pulse_length[throt] < 1050) {
+  if (status == stopped && pulse_length[yaw] <= 1050 && pulse_length[throt] <= 1050) {
     status = starting;
   }
 
   // When left stick is moved back in the center position
-  if (status == starting && pulse_length[yaw] > 1450 && pulse_length[throt] < 1050) {
+  if (status == starting && pulse_length[yaw] > 1450 && pulse_length[throt] <= 1050) {
     status = started;
 
     // Reset PID controller's variables to prevent bump start
@@ -334,7 +309,7 @@ bool is_started() {
   }
 
   // When left stick is moved in the bottom right corner
-  if (status == started && pulse_length[yaw] > 1950 && pulse_length[throt] < 1050) {
+  if (status == started && pulse_length[yaw] >= 1950 && pulse_length[throt] <= 1050) {
     status = stopped;
     // Make sure to always stop motors when status is STOPPED
     stop_all();
@@ -384,10 +359,10 @@ void pid_control() {
   throttle = pulse_length[throt];
   if (throttle > 1800)throttle = 1800;
 
-  esc1 = throttle - roll_pid + pitch_pid + yaw_pid;
-  esc2 = throttle + roll_pid + pitch_pid - yaw_pid;
-  esc3 = throttle - roll_pid - pitch_pid - yaw_pid;
-  esc4 = throttle + roll_pid - pitch_pid + yaw_pid;
+  esc1 = throttle - roll_pid - pitch_pid + yaw_pid;
+  esc2 = throttle + roll_pid - pitch_pid - yaw_pid;
+  esc3 = throttle - roll_pid + pitch_pid - yaw_pid;
+  esc4 = throttle + roll_pid + pitch_pid + yaw_pid;
 
 //  compensate_battery();
 
@@ -404,12 +379,12 @@ void pid_control() {
 
 
 void run_motors() {
-  if (micros() - loop_timer > 4050)digitalWrite(2, HIGH);
+  if (micros() - loop_timer > 4050)digitalWrite(49, HIGH);
   while (micros() - loop_timer < 4000);
   loop_timer = micros();
 
   PORTA |= B11110000;
-
+  
   while (PORTA >= 16) {
     time_diff = micros();
     time_diff -= loop_timer;
@@ -551,12 +526,12 @@ void print_angles() {
  }
 
  void print_gyro_raw() {
-  Serial.print("Gyro Pitch: ");
-  Serial.print(gyro_pitch);
-  Serial.print(" Gyro Roll: ");
-  Serial.print(gyro_roll);
-  Serial.print(" Accel Y: ");
-  Serial.print(acc_pitch_angle);
+  Serial.print("Gyro X: ");
+  Serial.print(gyro_x);
+  Serial.print(" Gyro Y: ");
+  Serial.print(gyro_y);
   Serial.print(" Accel X: ");
-  Serial.println(acc_roll_angle);
+  Serial.print(accel_x);
+  Serial.print(" Accel Y: ");
+  Serial.println(accel_y);
  }

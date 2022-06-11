@@ -27,10 +27,10 @@ void setup() {
   Serial.begin(57600);
   TWBR = 12;
   Wire.begin();
-  digitalWrite(46, HIGH);
+  digitalWrite(49, HIGH);
   set_mpu();
   calc_gyro_offsets();
-  digitalWrite(46, LOW);
+  digitalWrite(49, LOW);
   loop_timer = micros();
 }
 
