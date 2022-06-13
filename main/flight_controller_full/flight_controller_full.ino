@@ -23,6 +23,7 @@ float acc_pitch_angle, acc_roll_angle;
 float accel_x, accel_y, accel_z, accel_vec_mag;
 float gyro_x, gyro_y, gyro_z;
 float pitch_angle, roll_angle, yaw_angle;
+float filtered_pitch, filtered_roll, filtered_yaw;
 
 int temp;
 boolean gyro_angle_set = false;
@@ -47,9 +48,10 @@ float roll_pid, pitch_pid, yaw_pid;
 float pitch_error, roll_error, yaw_error;
 float pitch_pid_i, roll_pid_i, yaw_pid_i;
 float previous_pitch_error, previous_roll_error, previous_yaw_error;
+float pitch_delta_error, roll_delta_error, yaw_delta_error;
 
 int throttle, battery_voltage, counter, gyro_address;
-int pid_max = 400;
+const int pid_max = 400;
 
 int status = stopped;
 
@@ -123,7 +125,7 @@ void loop() {
 
   calculate_setpoints();
 
-  calculate_pid();
+  calculate_errors();
   
   if (is_started()) pid_control();
 
@@ -231,6 +233,10 @@ void calculate_angles() {
     reset_gyro_angles();
     gyro_angle_set = true;
   }
+
+  filtered_pitch = filtered_pitch * 0.9 + pitch_angle * 0.1;
+  filtered_roll = filtered_roll * 0.9 + roll_angle * 0.1;
+  filtered_yaw = -gyro_z / 65.5;
   
   pitch_input = 0.7 * pitch_input + 0.3 * gyro_x / 65.5;
   roll_input = 0.7 * roll_input + 0.3 * gyro_y / 65.5;
@@ -246,8 +252,8 @@ void reset_gyro_angles() {
 
 
 void calculate_setpoints() {
-  pitch_setpoint = calculate_setpoint(pitch_angle, pulse_length[pitch]);
-  roll_setpoint = calculate_setpoint(roll_angle, pulse_length[roll]);
+  pitch_setpoint = calculate_setpoint(filtered_pitch, pulse_length[pitch]);
+  roll_setpoint = calculate_setpoint(filtered_roll, pulse_length[roll]);
   yaw_setpoint = calculate_yaw_setpoint(pulse_length[yaw], pulse_length[throt]);
 }
 
@@ -325,56 +331,54 @@ void stop_all() {
 }
 
 
-void calculate_pid() {
+void calculate_errors() {
   roll_error = roll_input - roll_setpoint;
   roll_pid_i += ki_roll * roll_error;
-  if (roll_pid_i > pid_max)roll_pid_i = pid_max;
-  else if (roll_pid_i < -pid_max)roll_pid_i = -pid_max;
-  roll_pid = kp_roll * roll_error + roll_pid_i + kd_roll * (roll_error - previous_roll_error);
-  if (roll_pid > pid_max)roll_pid = pid_max;
-  else if (roll_pid < -pid_max)roll_pid = -pid_max;
+  roll_delta_error = roll_error - previous_roll_error;
   previous_roll_error = roll_error;
 
   pitch_error = pitch_input - pitch_setpoint;
   pitch_pid_i += ki_pitch * pitch_error;
-  if (pitch_pid_i > pid_max)pitch_pid_i = pid_max;
-  else if (pitch_pid_i < -pid_max)pitch_pid_i = -pid_max;
-  pitch_pid = kp_pitch * pitch_error + pitch_pid_i + kd_pitch * (pitch_error - previous_pitch_error);
-  if (pitch_pid > pid_max)pitch_pid = pid_max;
-  else if (pitch_pid < -pid_max)pitch_pid = -pid_max;
+  pitch_delta_error = pitch_error - previous_pitch_error;
   previous_pitch_error = pitch_error;
 
   yaw_error = yaw_input - yaw_setpoint;
   yaw_pid_i += ki_yaw * yaw_error;
-  if (yaw_pid_i > pid_max)yaw_pid_i = pid_max;
-  else if (yaw_pid_i < -pid_max)yaw_pid_i = -pid_max;
-  yaw_pid = kp_yaw * yaw_error + yaw_pid_i + kd_yaw * (yaw_error - previous_yaw_error);
-  if (yaw_pid > pid_max)yaw_pid = pid_max;
-  else if (yaw_pid < -pid_max)yaw_pid = -pid_max;
+  yaw_delta_error = yaw_error - previous_yaw_error;
   previous_yaw_error = yaw_error;
 }
 
+float min_max(float value, float min_value, float max_value) {
+  if (value > max_value)value = max_value;
+  else if (value < min_value)value = min_value;
+  return value;
+}
 
 void pid_control() {
   throttle = pulse_length[throt];
   if (throttle > 1800)throttle = 1800;
 
-  esc1 = throttle - roll_pid - pitch_pid + yaw_pid;
-  esc2 = throttle + roll_pid - pitch_pid - yaw_pid;
-  esc3 = throttle - roll_pid + pitch_pid - yaw_pid;
-  esc4 = throttle + roll_pid + pitch_pid + yaw_pid;
+  if (throttle > 1050) {  
+    pitch_pid = kp_pitch * pitch_error + pitch_pid_i + kd_pitch * pitch_delta_error;
+    roll_pid = kp_roll * roll_error + roll_pid_i + kd_roll * roll_delta_error;
+    yaw_pid = kp_yaw * yaw_error + yaw_pid_i + kd_yaw * yaw_delta_error;
 
-//  compensate_battery();
+    pitch_pid = min_max(pitch_pid, -pid_max, pid_max);
+    roll_pid = min_max(pitch_pid, -pid_max, pid_max);
+    yaw_pid = min_max(pitch_pid, -pid_max, pid_max);
+    
+    esc1 = throttle - roll_pid - pitch_pid + yaw_pid;
+    esc2 = throttle + roll_pid - pitch_pid - yaw_pid;
+    esc3 = throttle - roll_pid + pitch_pid - yaw_pid;
+    esc4 = throttle + roll_pid + pitch_pid + yaw_pid;
+  }
 
-  if (esc1 < 1100) esc1 = 1100;
-  if (esc2 < 1100) esc2 = 1100;
-  if (esc3 < 1100) esc3 = 1100;
-  if (esc4 < 1100) esc4 = 1100;
+  compensate_battery();
 
-  if (esc1 > 2000) esc1 = 2000;
-  if (esc2 > 2000) esc2 = 2000;
-  if (esc3 > 2000) esc3 = 2000;
-  if (esc4 > 2000) esc4 = 2000;
+  esc1 = min_max(esc1, 1100, 2000);
+  esc2 = min_max(esc2, 1100, 2000);
+  esc3 = min_max(esc3, 1100, 2000);
+  esc4 = min_max(esc4, 1100, 2000);
 }
 
 
