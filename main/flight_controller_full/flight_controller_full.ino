@@ -10,7 +10,7 @@
 #define starting 1
 #define started 2
 
-#define refresh_rate 238
+#define refresh_rate 225
 
 byte eeprom_data[36];
 volatile int receiver_input[5];
@@ -34,9 +34,9 @@ unsigned long int esc1, esc2, esc3, esc4;
 float roll_setpoint, pitch_setpoint, yaw_setpoint;
 float roll_input, pitch_input, yaw_input;
 
-float kp_roll = 1;
-float ki_roll = 0.08;
-float kd_roll = 18;
+float kp_roll = 1.5;
+float ki_roll = 0.04;
+float kd_roll = 12;
 float kp_pitch = kp_roll;
 float ki_pitch = ki_roll;
 float kd_pitch = kd_roll;
@@ -51,7 +51,7 @@ float previous_pitch_error, previous_roll_error, previous_yaw_error;
 float pitch_delta_error, roll_delta_error, yaw_delta_error;
 
 int throttle, battery_voltage, counter, gyro_address;
-const int pid_max = 400;
+const int pid_max = 300;
 
 int status = stopped;
 
@@ -125,7 +125,7 @@ void loop() {
 
   calculate_setpoints();
 
-  calculate_errors();
+  calculate_pid();
   
   if (is_started()) pid_control();
 
@@ -262,10 +262,10 @@ float calculate_setpoint(float out_angle, int channel_pulse) {
   float level_adjust = out_angle * 15;
   float setpoint = 0;
 
-  if (channel_pulse > 1520) {
-    setpoint = channel_pulse - 1520;
-  } else if (channel_pulse <  1480) {
-    setpoint = channel_pulse - 1480;
+  if (channel_pulse > 1508) {
+    setpoint = channel_pulse - 1508;
+  } else if (channel_pulse <  1492) {
+    setpoint = channel_pulse - 1492;
   }
 
   setpoint -= level_adjust;
@@ -331,20 +331,29 @@ void stop_all() {
 }
 
 
-void calculate_errors() {
+void calculate_pid() {
   roll_error = roll_input - roll_setpoint;
   roll_pid_i += ki_roll * roll_error;
+  roll_pid_i = min_max(roll_pid_i, -pid_max, pid_max);
   roll_delta_error = roll_error - previous_roll_error;
+  roll_pid = kp_roll * roll_error + roll_pid_i + kd_roll * roll_delta_error;
+  roll_pid = min_max(roll_pid, -pid_max, pid_max);
   previous_roll_error = roll_error;
 
   pitch_error = pitch_input - pitch_setpoint;
   pitch_pid_i += ki_pitch * pitch_error;
+  pitch_pid_i = min_max(pitch_pid_i, -pid_max, pid_max);
   pitch_delta_error = pitch_error - previous_pitch_error;
+  pitch_pid = kp_pitch * pitch_error + pitch_pid_i + kd_pitch * pitch_delta_error;
+  pitch_pid = min_max(pitch_pid, -pid_max, pid_max);
   previous_pitch_error = pitch_error;
 
   yaw_error = yaw_input - yaw_setpoint;
   yaw_pid_i += ki_yaw * yaw_error;
+  yaw_pid_i = min_max(yaw_pid_i, -pid_max, pid_max);
   yaw_delta_error = yaw_error - previous_yaw_error;
+  yaw_pid = kp_yaw * yaw_error + yaw_pid_i + kd_yaw * yaw_delta_error;
+  yaw_pid = min_max(yaw_pid, -pid_max, pid_max);
   previous_yaw_error = yaw_error;
 }
 
@@ -359,13 +368,6 @@ void pid_control() {
   if (throttle > 1800)throttle = 1800;
 
   if (throttle > 1050) {  
-    pitch_pid = kp_pitch * pitch_error + pitch_pid_i + kd_pitch * pitch_delta_error;
-    roll_pid = kp_roll * roll_error + roll_pid_i + kd_roll * roll_delta_error;
-    yaw_pid = kp_yaw * yaw_error + yaw_pid_i + kd_yaw * yaw_delta_error;
-
-    pitch_pid = min_max(pitch_pid, -pid_max, pid_max);
-    roll_pid = min_max(roll_pid, -pid_max, pid_max);
-    yaw_pid = min_max(yaw_pid, -pid_max, pid_max);
     
     esc1 = throttle - roll_pid - pitch_pid - yaw_pid;
     esc2 = throttle + roll_pid - pitch_pid + yaw_pid;
@@ -383,8 +385,8 @@ void pid_control() {
 
 
 void run_motors() {
-  if (micros() - loop_timer > 4250)digitalWrite(49, HIGH);
-  while (micros() - loop_timer < 4200);
+  if (micros() - loop_timer > 4500)digitalWrite(49, HIGH);
+  while (micros() - loop_timer < 4444);
   loop_timer = micros();
 
   PORTA |= B11110000;
