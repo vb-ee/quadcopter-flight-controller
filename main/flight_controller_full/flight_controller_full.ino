@@ -10,7 +10,7 @@
 #define starting 1
 #define started 2
 
-#define refresh_rate 250
+#define refresh_rate 238
 
 byte eeprom_data[36];
 volatile int receiver_input[5];
@@ -34,9 +34,9 @@ unsigned long int esc1, esc2, esc3, esc4;
 float roll_setpoint, pitch_setpoint, yaw_setpoint;
 float roll_input, pitch_input, yaw_input;
 
-float kp_roll = 1.3;
-float ki_roll = 0.04;
-float kd_roll = 18.0;
+float kp_roll = 1;
+float ki_roll = 0.08;
+float kd_roll = 18;
 float kp_pitch = kp_roll;
 float ki_pitch = ki_roll;
 float kd_pitch = kd_roll;
@@ -262,10 +262,10 @@ float calculate_setpoint(float out_angle, int channel_pulse) {
   float level_adjust = out_angle * 15;
   float setpoint = 0;
 
-  if (channel_pulse > 1508) {
-    setpoint = channel_pulse - 1508;
-  } else if (channel_pulse <  1492) {
-    setpoint = channel_pulse - 1492;
+  if (channel_pulse > 1520) {
+    setpoint = channel_pulse - 1520;
+  } else if (channel_pulse <  1480) {
+    setpoint = channel_pulse - 1480;
   }
 
   setpoint -= level_adjust;
@@ -364,27 +364,27 @@ void pid_control() {
     yaw_pid = kp_yaw * yaw_error + yaw_pid_i + kd_yaw * yaw_delta_error;
 
     pitch_pid = min_max(pitch_pid, -pid_max, pid_max);
-    roll_pid = min_max(pitch_pid, -pid_max, pid_max);
-    yaw_pid = min_max(pitch_pid, -pid_max, pid_max);
+    roll_pid = min_max(roll_pid, -pid_max, pid_max);
+    yaw_pid = min_max(yaw_pid, -pid_max, pid_max);
     
-    esc1 = throttle - roll_pid - pitch_pid + yaw_pid;
-    esc2 = throttle + roll_pid - pitch_pid - yaw_pid;
-    esc3 = throttle - roll_pid + pitch_pid - yaw_pid;
-    esc4 = throttle + roll_pid + pitch_pid + yaw_pid;
+    esc1 = throttle - roll_pid - pitch_pid - yaw_pid;
+    esc2 = throttle + roll_pid - pitch_pid + yaw_pid;
+    esc3 = throttle - roll_pid + pitch_pid + yaw_pid;
+    esc4 = throttle + roll_pid + pitch_pid - yaw_pid;
+
+    esc1 = min_max(esc1, 1100, 2000);
+    esc2 = min_max(esc2, 1100, 2000);
+    esc3 = min_max(esc3, 1100, 2000);
+    esc4 = min_max(esc4, 1100, 2000);
   }
 
-  compensate_battery();
-
-  esc1 = min_max(esc1, 1100, 2000);
-  esc2 = min_max(esc2, 1100, 2000);
-  esc3 = min_max(esc3, 1100, 2000);
-  esc4 = min_max(esc4, 1100, 2000);
+//  compensate_battery();
 }
 
 
 void run_motors() {
-  if (micros() - loop_timer > 4050)digitalWrite(49, HIGH);
-  while (micros() - loop_timer < 4000);
+  if (micros() - loop_timer > 4250)digitalWrite(49, HIGH);
+  while (micros() - loop_timer < 4200);
   loop_timer = micros();
 
   PORTA |= B11110000;
@@ -524,9 +524,11 @@ void print_pulses() {
 
 void print_angles() {
   Serial.print("Pitch Angle: ");
-  Serial.print(pitch_angle);
+  Serial.print(filtered_pitch);
+  Serial.print(" Gyro Yaw: ");
+  Serial.print(filtered_yaw);
   Serial.print(" Roll Angle: ");
-  Serial.println(roll_angle);
+  Serial.println(filtered_roll);
  }
 
  void print_gyro_raw() {
