@@ -10,7 +10,7 @@
 #define starting 1
 #define started 2
 
-#define refresh_rate 225
+#define refresh_rate 240
 
 byte eeprom_data[36];
 volatile int receiver_input[5];
@@ -34,9 +34,9 @@ unsigned long int esc1, esc2, esc3, esc4;
 float roll_setpoint, pitch_setpoint, yaw_setpoint;
 float roll_input, pitch_input, yaw_input;
 
-float kp_roll = 1.5;
+float kp_roll = 1.4;
 float ki_roll = 0.04;
-float kd_roll = 12;
+float kd_roll = 13;
 float kp_pitch = kp_roll;
 float ki_pitch = ki_roll;
 float kd_pitch = kd_roll;
@@ -51,7 +51,7 @@ float previous_pitch_error, previous_roll_error, previous_yaw_error;
 float pitch_delta_error, roll_delta_error, yaw_delta_error;
 
 int throttle, battery_voltage, counter, gyro_address;
-const int pid_max = 300;
+const int pid_max = 400;
 
 int status = stopped;
 
@@ -374,19 +374,20 @@ void pid_control() {
     esc3 = throttle - roll_pid + pitch_pid + yaw_pid;
     esc4 = throttle + roll_pid + pitch_pid - yaw_pid;
 
+    compensate_battery();
+
     esc1 = min_max(esc1, 1100, 2000);
     esc2 = min_max(esc2, 1100, 2000);
     esc3 = min_max(esc3, 1100, 2000);
     esc4 = min_max(esc4, 1100, 2000);
   }
 
-//  compensate_battery();
 }
 
 
 void run_motors() {
-  if (micros() - loop_timer > 4500)digitalWrite(49, HIGH);
-  while (micros() - loop_timer < 4444);
+  if (micros() - loop_timer > 4200)digitalWrite(49, HIGH);
+  while (micros() - loop_timer < 4167);
   loop_timer = micros();
 
   PORTA |= B11110000;
