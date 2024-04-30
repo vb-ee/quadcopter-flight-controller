@@ -2,17 +2,20 @@
 
 int throttle;
 
-
-void setup() {
+void setup()
+{
   Serial.begin(9600);
   DDRA |= B11110000;
 }
 
-void loop() {
-  if (Serial.available() > 0) {
+void loop()
+{
+  if (Serial.available() > 0)
+  {
     throttle = Serial.parseInt();
 
-    while (Serial.available() > 0) {
+    while (Serial.available() > 0)
+    {
       Serial.read();
     }
   }
