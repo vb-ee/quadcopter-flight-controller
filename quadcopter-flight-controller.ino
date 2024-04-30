@@ -81,7 +81,7 @@ void setup()
   set_mpu6050();
 
   for (int i = 0; i < 1250; i++)
-  {                     // Wait 5 seconds before continuing.
+  { // Wait 5 seconds before continuing.
     PORTA |= B11110000; // Set digital ports 26, 27, 28 and 29 high.
     delayMicroseconds(1000);
     PORTA &= B00001111; // Set digital ports 26, 27, 28 and 29 low.
@@ -108,7 +108,7 @@ void setup()
     PORTA &= B00001111;      // Set digital poort 26, 27, 28 and 29 low.
     delay(3);                // Wait 3 milliseconds before the next loop.
     if (counter == 125)
-    {                                     // Every 125 loops (500ms).
+    { // Every 125 loops (500ms).
       digitalWrite(49, !digitalRead(49)); // Change the led status.
       counter = 0;                        // Start again at 0.
     }
@@ -133,8 +133,10 @@ void loop()
 
   calculate_pid();
 
-  if (is_started())
+  if (is_started()) {
     pid_control();
+  }
+
 
   run_motors();
 }
@@ -512,13 +514,13 @@ ISR(PCINT0_vect)
   if (PINB & B00010000)
   { // Is input 10 high?
     if (last_channel_1 == 0)
-    {                         // Input 10 changed from 0 to 1.
+    { // Input 10 changed from 0 to 1.
       last_channel_1 = 1;     // Remember current input state.
       timer_1 = current_time; // Set timer_1 to current_time.
     }
   }
   else if (last_channel_1 == 1)
-  {                                             // Input 10 is not high and changed from 1 to 0.
+  { // Input 10 is not high and changed from 1 to 0.
     last_channel_1 = 0;                         // Remember current input state.
     receiver_input[1] = current_time - timer_1; // Channel 1 is current_time - timer_1.
   }
@@ -526,13 +528,13 @@ ISR(PCINT0_vect)
   if (PINB & B00100000)
   { // Is input 11 high?
     if (last_channel_2 == 0)
-    {                         // Input 11 changed from 0 to 1.
+    { // Input 11 changed from 0 to 1.
       last_channel_2 = 1;     // Remember current input state.
       timer_2 = current_time; // Set timer_2 to current_time.
     }
   }
   else if (last_channel_2 == 1)
-  {                                             // Input 11 is not high and changed from 1 to 0.
+  { // Input 11 is not high and changed from 1 to 0.
     last_channel_2 = 0;                         // Remember current input state.
     receiver_input[2] = current_time - timer_2; // Channel 2 is current_time - timer_2.
   }
@@ -540,13 +542,13 @@ ISR(PCINT0_vect)
   if (PINB & B01000000)
   { // Is input 12 high?
     if (last_channel_3 == 0)
-    {                         // Input 12 changed from 0 to 1.
+    { // Input 12 changed from 0 to 1.
       last_channel_3 = 1;     // Remember current input state.
       timer_3 = current_time; // Set timer_3 to current_time.
     }
   }
   else if (last_channel_3 == 1)
-  {                                             // Input 12 is not high and changed from 1 to 0.
+  { // Input 12 is not high and changed from 1 to 0.
     last_channel_3 = 0;                         // Remember current input state.
     receiver_input[3] = current_time - timer_3; // Channel 3 is current_time - timer_3.
   }
@@ -554,13 +556,13 @@ ISR(PCINT0_vect)
   if (PINB & B10000000)
   { // Is input 13 high?
     if (last_channel_4 == 0)
-    {                         // Input 13 changed from 0 to 1.
+    { // Input 13 changed from 0 to 1.
       last_channel_4 = 1;     // Remember current input state.
       timer_4 = current_time; // Set timer_4 to current_time.
     }
   }
   else if (last_channel_4 == 1)
-  {                                             // Input 13 is not high and changed from 1 to 0.
+  { // Input 13 is not high and changed from 1 to 0.
     last_channel_4 = 0;                         // Remember current input state.
     receiver_input[4] = current_time - timer_4; // Channel 4 is current_time - timer_4.
   }
